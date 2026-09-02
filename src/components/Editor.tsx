@@ -2,6 +2,7 @@ import { useState } from 'react'
 import type { Project } from '../App'
 import { Toolbar } from './Toolbar'
 import { RTE } from './RTE'
+import { isAIConfigured, generateWithAI, getSectionPrompt } from '../services/ai'
 
 interface EditorProps {
   project: Project
@@ -9,10 +10,13 @@ interface EditorProps {
   onSave: () => void
   onSaveAs: () => void
   onExport?: (format: 'pdf' | 'docx') => void
+  onOpenAISettings?: () => void
 }
 
-export function Editor({ project, onUpdate, onSave, onSaveAs, onExport }: EditorProps) {
+export function Editor({ project, onUpdate, onSave, onSaveAs, onExport, onOpenAISettings }: EditorProps) {
   const [activeSection, setActiveSection] = useState('identitas')
+  const [aiLoading, setAiLoading] = useState(false)
+  const [aiError, setAiError] = useState('')
 
   const updateField = (key: string, value: string) => {
     onUpdate({
@@ -43,9 +47,27 @@ export function Editor({ project, onUpdate, onSave, onSaveAs, onExport }: Editor
     { id: 'referensi', label: 'Referensi', icon: '📖' },
   ]
 
+  const handleAIGenerate = async (section: string) => {
+    if (!isAIConfigured()) {
+      setAiError('⚠️ AI belum dikonfigurasi. Buka Settings (Tools → AI Settings) untuk mengatur.')
+      return
+    }
+    setAiLoading(true)
+    setAiError('')
+    try {
+      const opts = getSectionPrompt(section, project.content)
+      const result = await generateWithAI(opts)
+      updateField(section, result)
+    } catch (err) {
+      setAiError(`❌ ${(err as Error).message}`)
+    } finally {
+      setAiLoading(false)
+    }
+  }
+
   return (
     <div className="flex-1 flex flex-col overflow-hidden">
-      <Toolbar onSave={onSave} onSaveAs={onSaveAs} onExport={onExport} />
+      <Toolbar onSave={onSave} onSaveAs={onSaveAs} onExport={onExport} onOpenAISettings={onOpenAISettings} />
 
       <div className="flex-1 overflow-y-auto bg-gray-200 p-8">
         <div className="max-w-4xl mx-auto bg-white shadow-lg min-h-[1100px]">
@@ -88,10 +110,20 @@ export function Editor({ project, onUpdate, onSave, onSaveAs, onExport }: Editor
                 <h2 className="text-lg font-bold">
                   {sections.find(s => s.id === activeSection)?.label.toUpperCase()}
                 </h2>
-                <button className="px-3 py-1 bg-purple-100 text-purple-700 rounded text-sm hover:bg-purple-200 flex items-center gap-1">
-                  ✨ Generate via AI
+                <button
+                  onClick={() => handleAIGenerate(activeSection)}
+                  disabled={aiLoading}
+                  className="px-3 py-1 bg-purple-100 text-purple-700 rounded text-sm hover:bg-purple-200 flex items-center gap-1 disabled:opacity-50"
+                >
+                  {aiLoading ? '⏳ Generating...' : '✨ Generate via AI'}
                 </button>
               </div>
+              {aiError && (
+                <div className="mb-4 p-3 bg-red-50 text-red-700 rounded text-sm">
+                  {aiError}
+                  <button onClick={() => setAiError('')} className="ml-2 underline">tutup</button>
+                </div>
+              )}
               <RTE
                 content={project.content[activeSection] || ''}
                 onUpdate={(html) => updateField(activeSection, html)}

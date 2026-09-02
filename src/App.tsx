@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import { Sidebar } from './components/Sidebar'
 import { Editor } from './components/Editor'
 import { StartScreen } from './components/StartScreen'
+import { AISettingsDialog } from './components/AISettingsDialog'
 import { exportDocx, exportPdf } from './services/export'
 
 export interface Project {
@@ -31,7 +32,7 @@ function App() {
   const [project, setProject] = useState<Project | null>(null)
   const [showStart, setShowStart] = useState(true)
   const [recentFiles, setRecentFiles] = useState<Array<{ path: string; name: string; openedAt: string }>>([])
-
+  const [showAISettings, setShowAISettings] = useState(false)
   const handleNewProject = (content?: Record<string, string>) => {
     setProject({ filePath: null, content: content || { ...defaultContent } })
     setShowStart(false)
@@ -120,6 +121,7 @@ function App() {
     window.electronAPI.onMenuNew(() => handleNewProject())
     window.electronAPI.onMenuSave(() => handleSaveProject())
     window.electronAPI.onMenuExport(() => handleExport())
+    window.electronAPI.onOpenAISettings(() => setShowAISettings(true))
   }, [project])
 
   if (showStart) {
@@ -146,7 +148,9 @@ function App() {
         onSave={handleSaveProject}
         onSaveAs={handleSaveAs}
         onExport={handleExport}
+        onOpenAISettings={() => setShowAISettings(true)}
       />
+      <AISettingsDialog open={showAISettings} onClose={() => setShowAISettings(false)} />
     </div>
   )
 }

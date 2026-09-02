@@ -4,9 +4,10 @@ interface ToolbarProps {
   onSave: () => void
   onSaveAs: () => void
   onExport?: (format: 'pdf' | 'docx') => void
+  onOpenAISettings?: () => void
 }
 
-export function Toolbar({ onSave, onSaveAs, onExport }: ToolbarProps) {
+export function Toolbar({ onSave, onSaveAs, onExport, onOpenAISettings }: ToolbarProps) {
   const [showExportMenu, setShowExportMenu] = useState(false)
 
   return (
@@ -29,7 +30,10 @@ export function Toolbar({ onSave, onSaveAs, onExport }: ToolbarProps) {
       </div>
 
       <div className="flex items-center gap-2">
-        <button className="px-3 py-1 text-sm bg-blue-100 hover:bg-blue-200 text-blue-700 rounded flex items-center gap-1">
+        <button
+          onClick={onOpenAISettings}
+          className="px-3 py-1 text-sm bg-blue-100 hover:bg-blue-200 text-blue-700 rounded flex items-center gap-1"
+        >
           🤖 AI Settings
         </button>
         <div className="relative">

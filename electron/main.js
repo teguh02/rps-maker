@@ -1,6 +1,7 @@
 const { app, BrowserWindow, ipcMain, dialog, Menu } = require('electron');
 const path = require('path');
 const fs = require('fs');
+const JSZip = require('jszip');
 
 let mainWindow;
 
@@ -11,7 +12,6 @@ function createWindow() {
     minWidth: 800,
     minHeight: 600,
     title: 'RPS Maker UNISINA',
-    icon: path.join(__dirname, '../public/icon.png'),
     webPreferences: {
       nodeIntegration: false,
       contextIsolation: true,
@@ -19,24 +19,21 @@ function createWindow() {
     },
   });
 
-  // Development: load from Vite dev server
   if (process.env.NODE_ENV === 'development' || !app.isPackaged) {
     mainWindow.loadURL('http://localhost:5173');
     mainWindow.webContents.openDevTools();
   } else {
-    // Production: load from dist folder
     mainWindow.loadFile(path.join(__dirname, '../dist/index.html'));
   }
 
-  // Custom menu
   const menuTemplate = [
     {
       label: 'File',
       submenu: [
         { label: 'New Project', accelerator: 'CmdOrCtrl+N', click: () => mainWindow.webContents.send('menu-new') },
-        { label: 'Open...', accelerator: 'CmdOrCtrl+O', click: () => handleOpen() },
+        { label: 'Open...', accelerator: 'CmdOrCtrl+O', click: () => mainWindow.webContents.send('menu-open') },
         { label: 'Save', accelerator: 'CmdOrCtrl+S', click: () => mainWindow.webContents.send('menu-save') },
-        { label: 'Save As...', accelerator: 'CmdOrCtrl+Shift+S', click: () => handleSaveAs() },
+        { label: 'Save As...', accelerator: 'CmdOrCtrl+Shift+S', click: () => mainWindow.webContents.send('menu-save-as') },
         { type: 'separator' },
         { label: 'Export...', accelerator: 'CmdOrCtrl+E', click: () => mainWindow.webContents.send('menu-export') },
         { type: 'separator' },
@@ -88,18 +85,46 @@ function createWindow() {
   });
 }
 
-// IPC Handlers
+function getRecentPath() {
+  const userData = app.getPath('userData');
+  return path.join(userData, 'recent.json');
+}
+
+function readRecent() {
+  const recentPath = getRecentPath();
+  if (!fs.existsSync(recentPath)) {
+    return [];
+  }
+  try {
+    const data = fs.readFileSync(recentPath, 'utf-8');
+    return JSON.parse(data);
+  } catch {
+    return [];
+  }
+}
+
+function writeRecent(recent) {
+  const recentPath = getRecentPath();
+  fs.mkdirSync(path.dirname(recentPath), { recursive: true });
+  fs.writeFileSync(recentPath, JSON.stringify(recent, null, 2));
+}
+
 ipcMain.handle('dialog:open', async () => {
   const result = await dialog.showOpenDialog(mainWindow, {
     properties: ['openFile'],
     filters: [{ name: 'RPS Files', extensions: ['rps'] }],
   });
-  if (!result.canceled && result.filePaths.length > 0) {
-    const filePath = result.filePaths[0];
-    const data = fs.readFileSync(filePath, 'utf-8');
-    return { filePath, data: JSON.parse(data) };
-  }
-  return null;
+  if (result.canceled || result.filePaths.length === 0) return null;
+
+  const filePath = result.filePaths[0];
+  const zipData = fs.readFileSync(filePath);
+  const zip = await JSZip.loadAsync(zipData);
+  const documentJson = await zip.file('document.json').async('string');
+
+  return {
+    filePath,
+    data: JSON.parse(documentJson),
+  };
 });
 
 ipcMain.handle('dialog:save', async (_, data) => {
@@ -107,11 +132,24 @@ ipcMain.handle('dialog:save', async (_, data) => {
     filters: [{ name: 'RPS Files', extensions: ['rps'] }],
     defaultPath: data.defaultName || 'untitled.rps',
   });
-  if (!result.canceled && result.filePath) {
-    fs.writeFileSync(result.filePath, JSON.stringify(data.content, null, 2));
-    return result.filePath;
-  }
-  return null;
+  if (result.canceled || !result.filePath) return null;
+
+  const zip = new JSZip();
+  zip.file('document.json', JSON.stringify(data.content, null, 2));
+  zip.file('metadata.json', JSON.stringify({
+    appName: 'RPS Maker UNISINA',
+    version: '1.0.0',
+    savedAt: new Date().toISOString(),
+  }, null, 2));
+
+  const zipBuffer = await zip.generateAsync({ type: 'nodebuffer' });
+  fs.writeFileSync(result.filePath, zipBuffer);
+
+  const recent = readRecent().filter(r => r.path !== result.filePath);
+  recent.unshift({ path: result.filePath, name: path.basename(result.filePath), openedAt: new Date().toISOString() });
+  writeRecent(recent.slice(0, 10));
+
+  return result.filePath;
 });
 
 ipcMain.handle('dialog:save-as', async (_, data) => {
@@ -119,35 +157,69 @@ ipcMain.handle('dialog:save-as', async (_, data) => {
     filters: [{ name: 'RPS Files', extensions: ['rps'] }],
     defaultPath: data.defaultName || 'untitled.rps',
   });
-  if (!result.canceled && result.filePath) {
-    fs.writeFileSync(result.filePath, JSON.stringify(data.content, null, 2));
-    return result.filePath;
-  }
-  return null;
+  if (result.canceled || !result.filePath) return null;
+
+  const zip = new JSZip();
+  zip.file('document.json', JSON.stringify(data.content, null, 2));
+  zip.file('metadata.json', JSON.stringify({
+    appName: 'RPS Maker UNISINA',
+    version: '1.0.0',
+    savedAt: new Date().toISOString(),
+  }, null, 2));
+
+  const zipBuffer = await zip.generateAsync({ type: 'nodebuffer' });
+  fs.writeFileSync(result.filePath, zipBuffer);
+
+  const recent = readRecent().filter(r => r.path !== result.filePath);
+  recent.unshift({ path: result.filePath, name: path.basename(result.filePath), openedAt: new Date().toISOString() });
+  writeRecent(recent.slice(0, 10));
+
+  return result.filePath;
 });
 
-ipcMain.handle('dialog:export', async (_, { format, data, defaultName }) => {
+ipcMain.handle('project:load', async (_, filePath) => {
+  if (!fs.existsSync(filePath)) return null;
+  const zipData = fs.readFileSync(filePath);
+  const zip = await JSZip.loadAsync(zipData);
+  const documentJson = await zip.file('document.json').async('string');
+
+  const recent = readRecent().filter(r => r.path !== filePath);
+  recent.unshift({ path: filePath, name: path.basename(filePath), openedAt: new Date().toISOString() });
+  writeRecent(recent.slice(0, 10));
+
+  return {
+    filePath,
+    data: JSON.parse(documentJson),
+  };
+});
+
+ipcMain.handle('dialog:export', async (_, { format }) => {
   const filters = {
     pdf: [{ name: 'PDF Files', extensions: ['pdf'] }],
     docx: [{ name: 'Word Documents', extensions: ['docx'] }],
   };
   const result = await dialog.showSaveDialog(mainWindow, {
     filters: filters[format] || [{ name: 'All Files', extensions: ['*'] }],
-    defaultPath: defaultName || `export.${format}`,
   });
-  if (!result.canceled && result.filePath) {
-    return { filePath: result.filePath, format, data };
-  }
-  return null;
+  if (result.canceled || !result.filePath) return null;
+  return { filePath: result.filePath, format };
 });
 
-function handleOpen() {
-  mainWindow.webContents.send('menu-new');
-}
+ipcMain.handle('recent:get', () => {
+  return readRecent();
+});
 
-function handleSaveAs() {
-  mainWindow.webContents.send('menu-save');
-}
+ipcMain.handle('recent:add', (_, filePath) => {
+  const recent = readRecent().filter(r => r.path !== filePath);
+  recent.unshift({ path: filePath, name: path.basename(filePath), openedAt: new Date().toISOString() });
+  writeRecent(recent.slice(0, 10));
+  return recent;
+});
+
+ipcMain.handle('recent:clear', () => {
+  writeRecent([]);
+  return [];
+});
 
 app.whenReady().then(createWindow);
 

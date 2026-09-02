@@ -29,6 +29,7 @@ const defaultContent: Record<string, string> = {
 function App() {
   const [project, setProject] = useState<Project | null>(null)
   const [showStart, setShowStart] = useState(true)
+  const [recentFiles, setRecentFiles] = useState<Array<{ path: string; name: string; openedAt: string }>>([])
 
   const handleNewProject = (content?: Record<string, string>) => {
     setProject({ filePath: null, content: content || { ...defaultContent } })
@@ -40,6 +41,8 @@ function App() {
     if (result) {
       setProject({ filePath: result.filePath, content: result.data })
       setShowStart(false)
+      window.electronAPI.addRecent(result.filePath)
+      loadRecentFiles()
     }
   }
 
@@ -54,6 +57,8 @@ function App() {
     const savedPath = await window.electronAPI.saveFile(data)
     if (savedPath) {
       setProject({ ...project, filePath: savedPath })
+      window.electronAPI.addRecent(savedPath)
+      loadRecentFiles()
     }
   }
 
@@ -68,17 +73,54 @@ function App() {
     const savedPath = await window.electronAPI.saveFileAs(data)
     if (savedPath) {
       setProject({ ...project, filePath: savedPath })
+      window.electronAPI.addRecent(savedPath)
+      loadRecentFiles()
     }
   }
 
+  const handleExport = async () => {
+    const result = await window.electronAPI.exportFile({ format: 'pdf' })
+    if (result) {
+      // TODO: implement PDF generation in Phase 5
+      console.log('Export to:', result.filePath)
+    }
+  }
+
+  const handleOpenRecent = async (filePath: string) => {
+    const result = await window.electronAPI.openProject(filePath)
+    if (result) {
+      setProject({ filePath: result.filePath, content: result.data })
+      setShowStart(false)
+      loadRecentFiles()
+    }
+  }
+
+  const loadRecentFiles = async () => {
+    const recent = await window.electronAPI.getRecent()
+    setRecentFiles(recent || [])
+  }
+
   useEffect(() => {
+    loadRecentFiles()
+
     window.electronAPI.onMenuNew(() => handleNewProject())
     window.electronAPI.onMenuSave(() => handleSaveProject())
-    window.electronAPI.onMenuExport(() => {})
+    window.electronAPI.onMenuExport(() => handleExport())
   }, [project])
 
   if (showStart) {
-    return <StartScreen onNew={handleNewProject} onOpen={handleOpenProject} />
+    return (
+      <StartScreen
+        onNew={handleNewProject}
+        onOpen={handleOpenProject}
+        recentFiles={recentFiles}
+        onOpenRecent={handleOpenRecent}
+        onClearRecent={async () => {
+          await window.electronAPI.clearRecent()
+          loadRecentFiles()
+        }}
+      />
+    )
   }
 
   return (

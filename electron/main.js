@@ -216,6 +216,11 @@ ipcMain.handle('recent:add', (_, filePath) => {
   return recent;
 });
 
+ipcMain.handle('file:write', async (_, filePath, buffer) => {
+  fs.writeFileSync(filePath, Buffer.from(buffer));
+  return true;
+});
+
 ipcMain.handle('recent:clear', () => {
   writeRecent([]);
   return [];

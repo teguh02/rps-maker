@@ -9,6 +9,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
   getRecent: () => ipcRenderer.invoke('recent:get'),
   addRecent: (filePath) => ipcRenderer.invoke('recent:add', filePath),
   clearRecent: () => ipcRenderer.invoke('recent:clear'),
+  writeFileToPath: (filePath, buffer) => ipcRenderer.invoke('file:write', filePath, buffer),
 
   onMenuNew: (callback) => ipcRenderer.on('menu-new', callback),
   onMenuSave: (callback) => ipcRenderer.on('menu-save', callback),

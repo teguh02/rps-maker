@@ -8,9 +8,10 @@ interface EditorProps {
   onUpdate: (content: Record<string, string>) => void
   onSave: () => void
   onSaveAs: () => void
+  onExport?: (format: 'pdf' | 'docx') => void
 }
 
-export function Editor({ project, onUpdate, onSave, onSaveAs }: EditorProps) {
+export function Editor({ project, onUpdate, onSave, onSaveAs, onExport }: EditorProps) {
   const [activeSection, setActiveSection] = useState('identitas')
 
   const updateField = (key: string, value: string) => {
@@ -44,7 +45,7 @@ export function Editor({ project, onUpdate, onSave, onSaveAs }: EditorProps) {
 
   return (
     <div className="flex-1 flex flex-col overflow-hidden">
-      <Toolbar onSave={onSave} onSaveAs={onSaveAs} />
+      <Toolbar onSave={onSave} onSaveAs={onSaveAs} onExport={onExport} />
 
       <div className="flex-1 overflow-y-auto bg-gray-200 p-8">
         <div className="max-w-4xl mx-auto bg-white shadow-lg min-h-[1100px]">

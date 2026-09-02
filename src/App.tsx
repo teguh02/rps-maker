@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import { Sidebar } from './components/Sidebar'
 import { Editor } from './components/Editor'
 import { StartScreen } from './components/StartScreen'
+import { exportDocx, exportPdf } from './services/export'
 
 export interface Project {
   filePath: string | null
@@ -78,11 +79,24 @@ function App() {
     }
   }
 
-  const handleExport = async () => {
-    const result = await window.electronAPI.exportFile({ format: 'pdf' })
+  const handleExport = async (format: 'pdf' | 'docx' = 'pdf') => {
+    if (!project) return
+    const ext = format === 'pdf' ? 'pdf' : 'docx'
+    const name = project.content.mata_kuliah
+      ? `RPS_${project.content.mata_kuliah.replace(/\s+/g, '_')}.${ext}`
+      : `export.${ext}`
+    const result = await window.electronAPI.exportFile({ format, defaultName: name })
     if (result) {
-      // TODO: implement PDF generation in Phase 5
-      console.log('Export to:', result.filePath)
+      try {
+        if (format === 'docx') {
+          await exportDocx({ content: project.content }, result.filePath)
+        } else {
+          await exportPdf({ content: project.content }, result.filePath)
+        }
+      } catch (err) {
+        console.error('Export error:', err)
+        alert('Gagal export: ' + (err as Error).message)
+      }
     }
   }
 
@@ -131,6 +145,7 @@ function App() {
         onUpdate={(content) => setProject({ ...project!, content })}
         onSave={handleSaveProject}
         onSaveAs={handleSaveAs}
+        onExport={handleExport}
       />
     </div>
   )

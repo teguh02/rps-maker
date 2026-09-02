@@ -1,35 +1,155 @@
+import { useState } from 'react'
+import { prodiData, getPreloadedTemplate } from '../templates/curriculum-data'
+
 interface StartScreenProps {
-  onNew: () => void
+  onNew: (content: Record<string, string>) => void
   onOpen: () => void
 }
 
 export function StartScreen({ onNew, onOpen }: StartScreenProps) {
+  const [selectedProdi, setSelectedProdi] = useState('')
+  const [selectedMK, setSelectedMK] = useState('')
+  const [showNewDialog, setShowNewDialog] = useState(false)
+
+  const selectedProdiData = prodiData.find(p => p.kode === selectedProdi)
+
+  const handleCreateNew = () => {
+    if (selectedProdi && selectedMK) {
+      const content = getPreloadedTemplate(selectedProdi, selectedMK)
+      onNew(content)
+    } else if (selectedProdi && !selectedMK) {
+      // Empty template for the selected prodi
+      onNew({
+        prodi: selectedProdiData?.nama || '',
+        mata_kuliah: '',
+        kode_mk: '',
+        sks: '',
+        semester: '',
+        dosen: '',
+        semester_akademik: '',
+        cpl: '',
+        cpmk: '',
+        sub_cpmk: '',
+        bahan_kajian: '',
+        metode: '',
+        pengalaman_belajar: '',
+        asesmen: '',
+        referensi: '',
+      })
+    } else {
+      // Completely empty
+      onNew({
+        prodi: '',
+        mata_kuliah: '',
+        kode_mk: '',
+        sks: '',
+        semester: '',
+        dosen: '',
+        semester_akademik: '',
+        cpl: '',
+        cpmk: '',
+        sub_cpmk: '',
+        bahan_kajian: '',
+        metode: '',
+        pengalaman_belajar: '',
+        asesmen: '',
+        referensi: '',
+      })
+    }
+  }
+
   return (
     <div className="h-screen flex flex-col items-center justify-center bg-gradient-to-br from-blue-50 to-indigo-100">
       <div className="text-center mb-12">
+        <div className="w-20 h-20 mx-auto mb-4 bg-white rounded-full shadow-lg flex items-center justify-center text-4xl">🎓</div>
         <h1 className="text-4xl font-bold text-gray-800 mb-2">RPS Maker</h1>
         <p className="text-lg text-gray-600">UNIVERSITAS IBNU SINA AJIBARANG</p>
       </div>
 
-      <div className="flex gap-4">
-        <button
-          onClick={onNew}
-          className="px-8 py-4 bg-white rounded-lg shadow-md hover:shadow-lg transition-shadow border border-gray-200 text-left group"
-        >
-          <div className="text-2xl mb-2">📄</div>
-          <div className="font-semibold text-gray-800 group-hover:text-blue-600">Project Baru</div>
-          <div className="text-sm text-gray-500">Buat RPS dari template kosong</div>
-        </button>
+      {!showNewDialog ? (
+        <div className="flex gap-4">
+          <button
+            onClick={() => setShowNewDialog(true)}
+            className="px-8 py-4 bg-white rounded-lg shadow-md hover:shadow-lg transition-shadow border border-gray-200 text-left group"
+          >
+            <div className="text-2xl mb-2">📄</div>
+            <div className="font-semibold text-gray-800 group-hover:text-blue-600">Project Baru</div>
+            <div className="text-sm text-gray-500">Buat RPS dari template kosong atau preloaded</div>
+          </button>
 
-        <button
-          onClick={onOpen}
-          className="px-8 py-4 bg-white rounded-lg shadow-md hover:shadow-lg transition-shadow border border-gray-200 text-left group"
-        >
-          <div className="text-2xl mb-2">📂</div>
-          <div className="font-semibold text-gray-800 group-hover:text-blue-600">Buka File</div>
-          <div className="text-sm text-gray-500">Buka project .rps yang sudah ada</div>
-        </button>
-      </div>
+          <button
+            onClick={onOpen}
+            className="px-8 py-4 bg-white rounded-lg shadow-md hover:shadow-lg transition-shadow border border-gray-200 text-left group"
+          >
+            <div className="text-2xl mb-2">📂</div>
+            <div className="font-semibold text-gray-800 group-hover:text-blue-600">Buka File</div>
+            <div className="text-sm text-gray-500">Buka project .rps yang sudah ada</div>
+          </button>
+        </div>
+      ) : (
+        <div className="bg-white rounded-lg shadow-lg p-6 w-full max-w-md">
+          <h2 className="text-xl font-bold mb-4">Project Baru</h2>
+
+          <div className="space-y-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Program Studi</label>
+              <select
+                value={selectedProdi}
+                onChange={(e) => {
+                  setSelectedProdi(e.target.value)
+                  setSelectedMK('')
+                }}
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+              >
+                <option value="">-- Pilih Prodi --</option>
+                {prodiData.map(p => (
+                  <option key={p.kode} value={p.kode}>{p.nama}</option>
+                ))}
+              </select>
+            </div>
+
+            {selectedProdiData && (
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Mata Kuliah (opsional)</label>
+                <select
+                  value={selectedMK}
+                  onChange={(e) => setSelectedMK(e.target.value)}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                >
+                  <option value="">-- Template Kosong --</option>
+                  {selectedProdiData.mataKuliah.map(mk => (
+                    <option key={mk.kode} value={mk.kode}>
+                      [{mk.kode}] {mk.nama} ({mk.sks} SKS)
+                    </option>
+                  ))}
+                </select>
+                {selectedMK && (
+                  <p className="text-xs text-green-600 mt-1">
+                    ✅ CPL, CPMK, Sub-CPMK, dan Referensi akan terisi otomatis dari kurikulum
+                  </p>
+                )}
+              </div>
+            )}
+
+            <div className="flex gap-3 pt-2">
+              <button
+                onClick={handleCreateNew}
+                className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors"
+              >
+                Buat Project
+              </button>
+              <button
+                onClick={() => setShowNewDialog(false)}
+                className="px-4 py-2 bg-gray-200 text-gray-700 rounded-md hover:bg-gray-300 transition-colors"
+              >
+                Batal
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      <p className="text-xs text-gray-400 mt-8">v1.0.0 — Dibuat untuk Dosen UNISINA</p>
     </div>
   )
 }

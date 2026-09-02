@@ -1,0 +1,78 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8">
+  <title>RPS Template</title>
+  <style>
+    body { font-family: Arial, sans-serif; margin: 2rem; }
+    .rps-document { max-width: 800px; margin: 0 auto; }
+    .editable { cursor: text; border-bottom: 1px dashed #ccc; padding: 2px 0; }
+    .editable:hover { background-color: #f0f0f0; }
+  </style>
+</head>
+<body>
+  <div class="rps-document">
+    <header class="rps-cover">
+      <img src="assets/logo-unisina.png" class="logo" alt="Logo UNISINA" />
+      <h1>RENCANA PEMBELAJARAN SEMESTER</h1>
+    </header>
+
+    <section class="identitas">
+      <table>
+        <tr><td>Program Studi</td><td class="editable" data-field="prodi"></td></tr>
+        <tr><td>Mata Kuliah</td><td class="editable" data-field="mata_kuliah"></td></tr>
+        <tr><td>Kode MK</td><td class="editable" data-field="kode_mk"></td></tr>
+        <tr><td>SKS</td><td class="editable" data-field="sks"></td></tr>
+        <tr><td>Semester</td><td class="editable" data-field="semester"></td></tr>
+        <tr><td>Dosen Pengampu</td><td class="editable" data-field="dosen"></td></tr>
+        <tr><td>Semester Akademik</td><td class="editable" data-field="semester_akademik"></td></tr>
+      </table>
+    </section>
+
+    <section class="cpl">
+      <h2>A. CAPAIAN PEMBELAJARAN LULUSAN (CPL)</h2>
+      <div class="editable-rich" data-field="cpl"></div>
+    </section>
+
+    <section class="cpmk">
+      <h2>B. CAPAIAN PEMBELAJARAN MATA KULIAH (CPMK)</h2>
+      <div class="editable-rich" data-field="cpmk"></div>
+    </section>
+
+    <section class="sub-cpmk">
+      <h2>C. SUB-CPMK</h2>
+      <div class="editable-rich" data-field="sub_cpmk"></div>
+    </section>
+
+    <section class="bahan-kajian">
+      <h2>D. BAHAN KAJIAN</h2>
+      <div class="editable-rich" data-field="bahan_kajian"></div>
+    </section>
+
+    <section class="metode">
+      <h2>E. METODE PEMBELAJARAN</h2>
+      <div class="editable-rich" data-field="metode"></div>
+    </section>
+
+    <section class="pengalaman-belajar">
+      <h2>F. PENGAALAMAN BELAJAR MAHASISWA</h2>
+      <div class="editable-rich" data-field="pengalaman_belajar"></div>
+    </section>
+
+    <section class="asesmen">
+      <h2>G. ASESMEN / PENILAIAN</h2>
+      <div class="editable-rich" data-field="asesmen"></div>
+    </section>
+
+    <section class="referensi">
+      <h2>H. DAFTAR REFERENSI</h2>
+      <div class="editable-rich" data-field="referensi"></div>
+    </section>
+
+    <footer class="ttd">
+      <div class="ttd-dosen">Dosen Pengampu</div>
+      <div class="ttd-kaprodi">Kaprodi</div>
+    </footer>
+  </div>
+</body>
+</html>

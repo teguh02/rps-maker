@@ -5,46 +5,33 @@ import { StartScreen } from './components/StartScreen'
 
 export interface Project {
   filePath: string | null
-  content: {
-    fields: Record<string, string>
-    sections: Record<string, string>
-    customizations: Record<string, string>
-  }
+  content: Record<string, string>
 }
 
-const defaultContent = {
-  fields: {
-    prodi: '',
-    mata_kuliah: '',
-    kode_mk: '',
-    sks: '',
-    semester: '',
-    dosen: '',
-    semester_akademik: '',
-  },
-  sections: {
-    cpl: '',
-    cpmk: '',
-    sub_cpmk: '',
-    bahan_kajian: '',
-    metode: '',
-    pengalaman_belajar: '',
-    asesmen: '',
-    referensi: '',
-  },
-  customizations: {
-    logo_path: '',
-    header_text: 'UNIVERSITAS IBNU SINA AJIBARANG',
-    nomor_surat: '',
-  },
+const defaultContent: Record<string, string> = {
+  prodi: '',
+  mata_kuliah: '',
+  kode_mk: '',
+  sks: '',
+  semester: '',
+  dosen: '',
+  semester_akademik: '',
+  cpl: '',
+  cpmk: '',
+  sub_cpmk: '',
+  bahan_kajian: '',
+  metode: '',
+  pengalaman_belajar: '',
+  asesmen: '',
+  referensi: '',
 }
 
 function App() {
   const [project, setProject] = useState<Project | null>(null)
   const [showStart, setShowStart] = useState(true)
 
-  const handleNewProject = () => {
-    setProject({ filePath: null, content: { ...defaultContent } })
+  const handleNewProject = (content?: Record<string, string>) => {
+    setProject({ filePath: null, content: content || { ...defaultContent } })
     setShowStart(false)
   }
 
@@ -59,8 +46,8 @@ function App() {
   const handleSaveProject = async () => {
     if (!project) return
     const data = {
-      defaultName: project.content.fields.mata_kuliah
-        ? `RPS_${project.content.fields.mata_kuliah.replace(/\s+/g, '_')}.rps`
+      defaultName: project.content.mata_kuliah
+        ? `RPS_${project.content.mata_kuliah.replace(/\s+/g, '_')}.rps`
         : 'untitled.rps',
       content: project.content,
     }
@@ -73,8 +60,8 @@ function App() {
   const handleSaveAs = async () => {
     if (!project) return
     const data = {
-      defaultName: project.content.fields.mata_kuliah
-        ? `RPS_${project.content.fields.mata_kuliah.replace(/\s+/g, '_')}.rps`
+      defaultName: project.content.mata_kuliah
+        ? `RPS_${project.content.mata_kuliah.replace(/\s+/g, '_')}.rps`
         : 'untitled.rps',
       content: project.content,
     }
@@ -84,13 +71,10 @@ function App() {
     }
   }
 
-  // Listen for menu events
   useEffect(() => {
     window.electronAPI.onMenuNew(() => handleNewProject())
     window.electronAPI.onMenuSave(() => handleSaveProject())
-    window.electronAPI.onMenuExport(() => {
-      // TODO: show export dialog
-    })
+    window.electronAPI.onMenuExport(() => {})
   }, [project])
 
   if (showStart) {

@@ -24,7 +24,10 @@
       "target": "nsis"
     },
     "linux": {
-      "target": ["AppImage", "deb"]
+      "target": [
+        "AppImage",
+        "deb"
+      ]
     },
     "mac": {
       "target": "dmg"
@@ -32,5 +35,19 @@
   },
   "keywords": [],
   "author": "teguh",
-  "license": "MIT"
+  "license": "MIT",
+  "dependencies": {
+    "@tiptap/extension-highlight": "^3.31.0",
+    "@tiptap/extension-image": "^3.31.0",
+    "@tiptap/extension-link": "^3.31.0",
+    "@tiptap/extension-placeholder": "^3.31.0",
+    "@tiptap/extension-table": "^3.31.0",
+    "@tiptap/extension-table-cell": "^3.31.0",
+    "@tiptap/extension-table-header": "^3.31.0",
+    "@tiptap/extension-table-row": "^3.31.0",
+    "@tiptap/extension-text-align": "^3.31.0",
+    "@tiptap/extension-underline": "^3.31.0",
+    "@tiptap/react": "^3.31.0",
+    "@tiptap/starter-kit": "^3.31.0"
+  }
 }

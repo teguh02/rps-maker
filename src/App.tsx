@@ -3,6 +3,7 @@ import { Sidebar } from './components/Sidebar'
 import { Editor } from './components/Editor'
 import { StartScreen } from './components/StartScreen'
 import { AISettingsDialog } from './components/AISettingsDialog'
+import { ImportDialog } from './components/ImportDialog'
 import { exportDocx, exportPdf } from './services/export'
 
 export interface Project {
@@ -33,6 +34,7 @@ function App() {
   const [showStart, setShowStart] = useState(true)
   const [recentFiles, setRecentFiles] = useState<Array<{ path: string; name: string; openedAt: string }>>([])
   const [showAISettings, setShowAISettings] = useState(false)
+  const [showImport, setShowImport] = useState(false)
   const handleNewProject = (content?: Record<string, string>) => {
     setProject({ filePath: null, content: content || { ...defaultContent } })
     setShowStart(false)
@@ -121,7 +123,19 @@ function App() {
     window.electronAPI.onMenuNew(() => handleNewProject())
     window.electronAPI.onMenuSave(() => handleSaveProject())
     window.electronAPI.onMenuExport(() => handleExport())
+    window.electronAPI.onMenuImport(() => setShowImport(true))
     window.electronAPI.onOpenAISettings(() => setShowAISettings(true))
+
+    // Keyboard shortcuts
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if ((e.ctrlKey || e.metaKey) && e.key === 's') {
+        e.preventDefault()
+        if (e.shiftKey) handleSaveAs()
+        else handleSaveProject()
+      }
+    }
+    window.addEventListener('keydown', handleKeyDown)
+    return () => window.removeEventListener('keydown', handleKeyDown)
   }, [project])
 
   if (showStart) {
@@ -151,6 +165,12 @@ function App() {
         onOpenAISettings={() => setShowAISettings(true)}
       />
       <AISettingsDialog open={showAISettings} onClose={() => setShowAISettings(false)} />
+      <ImportDialog open={showImport} onClose={() => setShowImport(false)} onImport={(data) => {
+        if (project) {
+          setProject({ ...project, content: { ...project.content, ...data } })
+        }
+        setShowStart(false)
+      }} />
     </div>
   )
 }

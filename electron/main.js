@@ -37,6 +37,8 @@ function createWindow() {
         { type: 'separator' },
         { label: 'Export...', accelerator: 'CmdOrCtrl+E', click: () => mainWindow.webContents.send('menu-export') },
         { type: 'separator' },
+        { label: 'Import Kurikulum...', click: () => mainWindow.webContents.send('menu-import') },
+        { type: 'separator' },
         { label: 'Exit', accelerator: process.platform === 'darwin' ? 'Cmd+Q' : 'Alt+F4', click: () => app.quit() },
       ],
     },

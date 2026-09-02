@@ -14,6 +14,7 @@ interface ElectronAPI {
   onMenuNew: (callback: () => void) => void
   onMenuSave: (callback: () => void) => void
   onMenuExport: (callback: () => void) => void
+  onMenuImport: (callback: () => void) => void
   onOpenAISettings: (callback: () => void) => void
 
   platform: string

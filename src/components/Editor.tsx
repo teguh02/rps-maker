@@ -47,6 +47,17 @@ export function Editor({ project, onUpdate, onSave, onSaveAs, onExport, onOpenAI
     { id: 'referensi', label: 'Referensi', icon: '📖' },
   ]
 
+  const sectionGuides: Record<string, string> = {
+    cpl: '💡 CPL ditetapkan oleh program studi dari kurikulum. Tidak boleh dihapus, tapi bisa ditambah.',
+    cpmk: '💡 CPMK harus terukur. Gunakan KKO Bloom: Mengidentifikasi (C2), Menganalisis (C4), Mencipta (C6).',
+    sub_cpmk: '💡 Pecah CPMK menjadi unit-unit kecil yang bisa diselesaikan dalam 1-2 pertemuan.',
+    bahan_kajian: '💡 Pilih bahan kajian yang relevan. Prioritaskan referensi max 5 tahun terakhir.',
+    metode: '💡 IKU 7: Minimal 40% mata kuliah harus pakai Case Method atau Team-Based Project.',
+    pengalaman_belajar: '💡 Deskripsikan aktivitas konkret yang harus diselesaikan mahasiswa per minggu.',
+    asesmen: '💡 Bobot asesmen partisipatif minimal 50% untuk pemenuhan IKU 7.',
+    referensi: '💡 Referensi harus terkini (max 5 tahun terakhir). Sertakan jurnal internasional bereputasi.',
+  }
+
   const handleAIGenerate = async (section: string) => {
     if (!isAIConfigured()) {
       setAiError('⚠️ AI belum dikonfigurasi. Buka Settings (Tools → AI Settings) untuk mengatur.')
@@ -130,7 +141,7 @@ export function Editor({ project, onUpdate, onSave, onSaveAs, onExport, onOpenAI
                 placeholder="Tulis konten di sini atau klik 'Generate via AI'..."
               />
               <div className="mt-3 text-xs text-gray-600 bg-gray-50 p-2 rounded">
-                💡 Tip: Bold, italic, lists, headings, dan table tersedia di menu Format.
+                {sectionGuides[activeSection] || '💡 Tip: Bold, italic, lists, headings, dan table tersedia di menu Format.'}
               </div>
             </section>
           )}

@@ -14,6 +14,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
   onMenuNew: (callback) => ipcRenderer.on('menu-new', callback),
   onMenuSave: (callback) => ipcRenderer.on('menu-save', callback),
   onMenuExport: (callback) => ipcRenderer.on('menu-export', callback),
+  onMenuImport: (callback) => ipcRenderer.on('menu-import', callback),
   onOpenAISettings: (callback) => ipcRenderer.on('open-ai-settings', callback),
 
   platform: process.platform,

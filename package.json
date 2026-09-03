@@ -62,6 +62,8 @@
     "concurrently": "^10.0.5",
     "electron": "^44.1.1",
     "electron-builder": "^26.15.3",
+    "png-to-ico": "^3.0.2",
+    "sharp": "^0.35.4",
     "tailwindcss": "^4.3.3",
     "typescript": "^7.0.2",
     "vite": "^8.2.2",

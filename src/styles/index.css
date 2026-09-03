@@ -11,9 +11,110 @@ body {
   overflow: hidden;
 }
 
+/* ── Paper canvas (Word-like centered page) ── */
+.paper-canvas {
+  width: 816px;
+  min-height: 1056px;
+  background: #fff;
+  box-shadow: 0 2px 12px rgba(0,0,0,0.15);
+  border-radius: 2px;
+  padding: 72px 80px;
+  flex-shrink: 0;
+  margin: 32px auto;
+}
+
+/* ── RPS Cover Page (matching real format) ── */
+.rps-cover {
+  text-align: center;
+  border: 2px solid #000;
+  padding: 2rem;
+  margin-bottom: 2rem;
+}
+
+.rps-cover-title {
+  margin-bottom: 2rem;
+}
+
+.rps-cover-title p {
+  margin: 0.3em 0;
+  font-size: 14pt;
+  text-align: center;
+}
+
+.rps-cover-logo {
+  margin: 2rem 0;
+}
+
+.rps-cover-logo img {
+  display: block;
+  margin: 0 auto 1rem;
+}
+
+.rps-cover-logo p {
+  font-size: 14pt;
+  text-align: center;
+}
+
+.rps-cover-footer {
+  margin-top: 2rem;
+}
+
+.rps-cover-footer p {
+  margin: 0.3em 0;
+  font-size: 14pt;
+  text-align: center;
+}
+
+/* ── Main RPS Header Table ── */
+.rps-main-header {
+  margin-bottom: 1rem;
+}
+
+.rps-header-table {
+  width: 100%;
+  border-collapse: collapse;
+  border: 1px solid #000;
+  font-size: 11pt;
+}
+
+.rps-header-table td,
+.rps-header-table th {
+  border: 1px solid #000;
+  padding: 4px 6px;
+  vertical-align: top;
+}
+
+.rps-header-logo {
+  text-align: center;
+  width: 10%;
+}
+
+.rps-header-info {
+  text-align: center;
+}
+
+.rps-header-info p {
+  margin: 0.2em 0;
+}
+
+.rps-header-code {
+  text-align: center;
+  width: 15%;
+}
+
+.rps-header-title {
+  text-align: center;
+  background: #f2f2f2;
+}
+
+.rps-header-title p {
+  margin: 0.3em 0;
+  font-size: 12pt;
+}
+
 /* ── Global layout rhythm ── */
 .editor-content section {
-  padding: 1.5rem 2rem;
+  padding: 1.5rem 2.5rem;
 }
 
 .editor-content section + section {
@@ -25,40 +126,47 @@ body {
   margin-bottom: 1rem;
 }
 
-/* ── Table rhythm ── */
+/* ── Table rhythm (matching real RPS format) ── */
 .editor-content table {
   width: 100%;
   border-collapse: collapse;
+  border: 1px solid #000;
 }
 
 .editor-content table td,
 .editor-content table th {
-  padding: 0.625rem 0.75rem;
-  border-bottom: 1px solid #e5e7eb;
+  padding: 0.5rem 0.625rem;
+  border: 1px solid #000;
   vertical-align: top;
+  font-size: 11pt;
+  line-height: 1.4;
 }
 
 .editor-content table th {
-  background: #f9fafb;
+  background: #f2f2f2;
   font-weight: 600;
-  text-align: left;
+  text-align: center;
 }
 
 /* ── Input fields inside tables ── */
 .editor-content table input {
   width: 100%;
-  padding: 0.375rem 0.5rem;
+  padding: 0.25rem 0.375rem;
   border: 1px solid transparent;
-  border-radius: 0.25rem;
-  transition: border-color 0.15s;
+  border-radius: 0;
+  font-size: 11pt;
+  background: transparent;
+  transition: border-color 0.15s, background 0.15s;
 }
 
 .editor-content table input:hover {
   border-color: #d1d5db;
+  background: #fafafa;
 }
 
 .editor-content table input:focus {
   border-color: #3b82f6;
+  background: #fff;
   outline: none;
   box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.15);
 }
@@ -154,36 +262,41 @@ body {
   color: #6b7280;
 }
 
-/* ── Section tab bar ── */
+/* ── Section tab bar (Excel-style) ── */
 .section-tabs {
   display: flex;
-  gap: 0.375rem;
-  padding: 0.5rem 1rem;
-  background: #fff;
-  border-top: 1px solid #e5e7eb;
+  gap: 0;
+  padding: 0;
+  background: #e0e0e0;
+  border-top: 1px solid #999;
   overflow-x: auto;
 }
 
 .section-tabs button {
-  padding: 0.375rem 0.75rem;
-  border-radius: 0.25rem;
-  font-size: 0.8125rem;
+  padding: 0.25rem 0.625rem;
+  border-radius: 0;
+  font-size: 0.75rem;
   white-space: nowrap;
-  transition: background 0.15s, color 0.15s;
+  transition: background 0.1s, color 0.1s;
+  border: 1px solid #999;
+  border-bottom: none;
+  margin-bottom: -1px;
 }
 
 .section-tabs button.active {
-  background: #2563eb;
-  color: #fff;
+  background: #fff;
+  color: #000;
+  font-weight: 600;
+  border-bottom: 1px solid #fff;
 }
 
 .section-tabs button:not(.active) {
-  background: #f3f4f6;
-  color: #4b5563;
+  background: #d4d4d4;
+  color: #333;
 }
 
 .section-tabs button:not(.active):hover {
-  background: #e5e7eb;
+  background: #c0c0c0;
 }
 
 /* ── AI generate button ── */

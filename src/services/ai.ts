@@ -101,6 +101,16 @@ Panduan penting:
   const c = content
 
   switch (section) {
+    case 'cpl':
+      return {
+        section,
+        systemPrompt: base,
+        userPrompt: `Buat CPL (Capaian Pembelajaran Lulusan) yang relevan untuk program studi "${c.prodi || ''}" di bawah Rumpun MK "${c.rumpun_mk || ''}".
+
+Mata Kuliah: ${c.mata_kuliah || ''} (${c.sks || '?'} SKS)
+
+CPL harus spesifik, terukur, dan menggunakan kata kerja operasional Taksonomi Bloom. Buat 3-5 CPL.`,
+      }
     case 'cpmk':
       return {
         section,
@@ -123,6 +133,17 @@ ${c.cpmk || 'Belum diisi'}
 
 Buat Sub-CPMK per minggu pertemuan. Gunakan format: "1.1 Menjelaskan...", "1.2 Menganalisis...", dst.`,
       }
+    case 'deskripsi_mk':
+      return {
+        section,
+        systemPrompt: base,
+        userPrompt: `Deskripsikan mata kuliah "${c.mata_kuliah || ''}" secara singkat (3-5 kalimat).
+
+Cakupan materi:
+${c.bahan_kajian || 'Belum diisi'}
+
+Deskripsi harus menjelaskan relevansi, cakupan materi, dan posisi mata kuliah dalam kurikulum program studi.`,
+      }
     case 'bahan_kajian':
       return {
         section,
@@ -134,69 +155,38 @@ ${c.cpmk || 'Belum diisi'}
 
 Buat daftar bahan kajian yang mencakup konsep dasar hingga aplikasi. Format: bullet point dengan penjelasan singkat.`,
       }
-    case 'metode':
+    case 'penilaian':
       return {
         section,
         systemPrompt: base,
-        userPrompt: `Pilih dan jelaskan metode pembelajaran yang sesuai untuk mata kuliah "${c.mata_kuliah || ''}" (${c.sks || '?'} SKS)
+        userPrompt: `Rancang format penilaian OBE untuk mata kuliah "${c.mata_kuliah || ''}"
 
 CPMK:
 ${c.cpmk || 'Belum diisi'}
 
-Rekomendasikan metode: Case Method, Team-Based Project, Problem-Based Learning, Diskusi, Presentasi, dll.
-Untuk pemenuhan IKU 7, pastikan minimal 40% menggunakan Case Method atau Team-Based Project.`,
+Buat komponen penilaian dengan:
+1. Komponen penilaian (Kehadiran, Partisipasi, Tugas, UTS, UAS, dll.)
+2. Bobot persentase per komponen (total harus 100%)
+
+Untuk pemenuhan IKU 7, bobot asesmen partisipatif (kehadiran + partisipasi + tugas) minimal 50%.`,
       }
-    case 'pengalaman_belajar':
+    case 'pustaka':
       return {
         section,
         systemPrompt: base,
-        userPrompt: `Rancang pengalaman belajar mahasiswa per minggu untuk mata kuliah "${c.mata_kuliah || ''}"
+        userPrompt: `Suggest pustaka untuk mata kuliah "${c.mata_kuliah || ''}"
 
-Sub-CPMK:
-${c.sub_cpmk || 'Belum diisi'}
+Buat 2 kategori:
+1. Pustaka Utama: Buku teks utama yang digunakan (minimal 2)
+2. Pustaka Pendukung: Jurnal, buku referensi tambahan
 
-Metode Pembelajaran:
-${c.metode || 'Belum diisi'}
-
-Deskripsikan aktivitas konkret yang harus diselesaikan mahasiswa per minggu pertemuan. Format: "Minggu 1: ..."`,
-      }
-    case 'asesmen':
-      return {
-        section,
-        systemPrompt: base,
-        userPrompt: `Rancang instrumen asesmen OBE untuk mata kuliah "${c.mata_kuliah || ''}"
-
-CPMK:
-${c.cpmk || 'Belum diisi'}
-
-Buat rubrik penilaian dengan:
-1. Komponen penilaian dan bobot persentase
-2. Indikator penilaian per komponen
-3. Rubrik level pencapaian (Sangat Baik, Baik, Cukup, Kurang)
-
-Untuk pemenuhan IKU 7, bobot asesmen partisipatif minimal 50%.`,
-      }
-    case 'referensi':
-      return {
-        section,
-        systemPrompt: base,
-        userPrompt: `Suggest referensi terkini (5 tahun terakhir, 2020-2026) untuk mata kuliah "${c.mata_kuliah || ''}"
-
-Bahan Kajian:
-${c.bahan_kajian || 'Belum diisi'}
-
-Sertakan minimal 4 referensi:
-- Buku teks internasional terbaru
-- Jurnal internasional bereputasi
-- Regulasi terkait (Permendikbudristek, SN-Dikti)
-
-Format: Nama Penulis. (Tahun). Judul. Penerbit/ISSN.`,
+Referensi harus terkini (5 tahun terakhir, 2020-2026). Format: Nama Penulis. (Tahun). Judul. Penerbit/ISSN.`,
       }
     default:
       return {
         section,
         systemPrompt: base,
-        userPrompt: `Generate konten untuk bagian ${section} dari RPS.`,
+        userPrompt: `Generate konten untuk bagian ${section} dari RPS mata kuliah "${c.mata_kuliah || ''}" dalam format HTML.`,
       }
   }
 }

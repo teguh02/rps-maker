@@ -12,21 +12,44 @@ export interface Project {
 }
 
 const defaultContent: Record<string, string> = {
+  // Identitas
   prodi: '',
   mata_kuliah: '',
   kode_mk: '',
+  rumpun_mk: '',
   sks: '',
   semester: '',
   dosen: '',
   semester_akademik: '',
+  tgl_penyusunan: '',
+  // Otorisasi
+  pengembang_rps: '',
+  koordinator_rmk: '',
+  kaprodi: '',
+  // CPL, CPMK, Sub-CPMK
   cpl: '',
   cpmk: '',
   sub_cpmk: '',
+  // Deskripsi
+  deskripsi_mk: '',
+  // Bahan Kajian
   bahan_kajian: '',
-  metode: '',
-  pengalaman_belajar: '',
-  asesmen: '',
-  referensi: '',
+  // Penilaian
+  penilaian: JSON.stringify([
+    { item: 'Kehadiran', bobot: 10 },
+    { item: 'Partisipasi', bobot: 5 },
+    { item: 'Tugas', bobot: 15 },
+    { item: 'UTS', bobot: 30 },
+    { item: 'UAS', bobot: 40 },
+  ]),
+  // Pustaka
+  pustaka_utama: '',
+  pustaka_pendukung: '',
+  // Dosen & Prasyarat
+  dosen_pengampu: '',
+  matakuliah_syarat: '',
+  // Tabel Pertemuan
+  pertemuan: '[]',
 }
 
 function App() {
@@ -162,6 +185,7 @@ function App() {
         onSaveAs={handleSaveAs}
         onExport={handleExport}
         onOpenAISettings={() => setShowAISettings(true)}
+        onGoHome={() => setShowStart(true)}
       />
       <AISettingsDialog open={showAISettings} onClose={() => setShowAISettings(false)} />
       <ImportDialog open={showImport} onClose={() => setShowImport(false)} onImport={(data) => {

@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { Sidebar } from './components/Sidebar'
+
 import { Editor } from './components/Editor'
 import { StartScreen } from './components/StartScreen'
 import { AISettingsDialog } from './components/AISettingsDialog'
@@ -155,7 +155,6 @@ function App() {
 
   return (
     <div className="flex h-screen bg-gray-100">
-      <Sidebar />
       <Editor
         project={project!}
         onUpdate={(content) => setProject({ ...project!, content })}

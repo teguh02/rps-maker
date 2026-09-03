@@ -80,28 +80,29 @@ export function Editor({ project, onUpdate, onSave, onSaveAs, onExport, onOpenAI
     <div className="flex-1 flex flex-col overflow-hidden">
       <Toolbar onSave={onSave} onSaveAs={onSaveAs} onExport={onExport} onOpenAISettings={onOpenAISettings} />
 
-      <div className="flex-1 overflow-y-auto bg-gray-200 p-8">
+      <div className="flex-1 overflow-y-auto bg-gray-200 p-6">
         <div className="max-w-4xl mx-auto bg-white shadow-lg min-h-[1100px]">
+          {/* Header */}
           <div className="text-center py-8 border-b">
             <div className="w-24 h-24 mx-auto mb-4 bg-gray-100 rounded-full flex items-center justify-center text-3xl">🎓</div>
             <h1 className="text-2xl font-bold mb-1">RENCANA PEMBELAJARAN SEMESTER</h1>
             <p className="text-sm text-gray-600">(RPS)</p>
           </div>
 
+          {/* Identitas section */}
           {activeSection === 'identitas' && (
-            <section className="p-8 border-b">
+            <section className="editor-content">
               <h2 className="text-lg font-bold mb-4">I. IDENTITAS MATA KULIAH</h2>
               <table className="w-full">
                 <tbody>
                   {Object.entries(fieldLabels).map(([key, label]) => (
-                    <tr key={key} className="border-b">
-                      <td className="py-2 w-48 font-medium text-gray-700">{label}</td>
-                      <td className="py-2">
+                    <tr key={key}>
+                      <td className="w-48 font-medium text-gray-700">{label}</td>
+                      <td>
                         <input
                           type="text"
                           value={project.content[key] || ''}
                           onChange={(e) => updateField(key, e.target.value)}
-                          className="w-full px-2 py-1 border border-transparent hover:border-gray-300 focus:border-blue-500 focus:outline-none rounded"
                           placeholder={`Masukkan ${label.toLowerCase()}`}
                         />
                       </td>
@@ -109,14 +110,15 @@ export function Editor({ project, onUpdate, onSave, onSaveAs, onExport, onOpenAI
                   ))}
                 </tbody>
               </table>
-              <div className="mt-3 text-xs text-blue-600 bg-blue-50 p-2 rounded">
+              <div className="section-guide text-blue-600 bg-blue-50 mt-4">
                 💡 Isi sesuai kurikulum program studi masing-masing.
               </div>
             </section>
           )}
 
+          {/* Other sections */}
           {activeSection !== 'identitas' && (
-            <section className="p-8 border-b">
+            <section className="editor-content">
               <div className="flex items-center justify-between mb-4">
                 <h2 className="text-lg font-bold">
                   {sections.find(s => s.id === activeSection)?.label.toUpperCase()}
@@ -124,7 +126,7 @@ export function Editor({ project, onUpdate, onSave, onSaveAs, onExport, onOpenAI
                 <button
                   onClick={() => handleAIGenerate(activeSection)}
                   disabled={aiLoading}
-                  className="px-3 py-1 bg-purple-100 text-purple-700 rounded text-sm hover:bg-purple-200 flex items-center gap-1 disabled:opacity-50"
+                  className="btn-ai"
                 >
                   {aiLoading ? '⏳ Generating...' : '✨ Generate via AI'}
                 </button>
@@ -140,39 +142,35 @@ export function Editor({ project, onUpdate, onSave, onSaveAs, onExport, onOpenAI
                 onUpdate={(html) => updateField(activeSection, html)}
                 placeholder="Tulis konten di sini atau klik 'Generate via AI'..."
               />
-              <div className="mt-3 text-xs text-gray-600 bg-gray-50 p-2 rounded">
+              <div className="section-guide">
                 {sectionGuides[activeSection] || '💡 Tip: Bold, italic, lists, headings, dan table tersedia di menu Format.'}
               </div>
             </section>
           )}
 
-          <section className="p-8">
-            <div className="flex justify-between">
-              <div className="text-center">
-                <div className="h-20"></div>
-                <div className="border-t w-48 mx-auto"></div>
-                <p className="mt-2 font-medium">Dosen Pengampu</p>
-              </div>
-              <div className="text-center">
-                <div className="h-20"></div>
-                <div className="border-t w-48 mx-auto"></div>
-                <p className="mt-2 font-medium">Kaprodi</p>
-              </div>
+          {/* Signature block */}
+          <section className="signature-block">
+            <div>
+              <div className="sig-space"></div>
+              <div className="sig-line"></div>
+              <p className="sig-label">Dosen Pengampu</p>
+            </div>
+            <div>
+              <div className="sig-space"></div>
+              <div className="sig-line"></div>
+              <p className="sig-label">Kaprodi</p>
             </div>
           </section>
         </div>
       </div>
 
-      <div className="bg-white border-t px-4 py-2 flex gap-2 overflow-x-auto">
+      {/* Bottom tab bar */}
+      <div className="section-tabs">
         {sections.map((section) => (
           <button
             key={section.id}
             onClick={() => setActiveSection(section.id)}
-            className={`px-3 py-1 rounded text-sm whitespace-nowrap transition-colors ${
-              activeSection === section.id
-                ? 'bg-blue-600 text-white'
-                : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-            }`}
+            className={activeSection === section.id ? 'active' : ''}
           >
             {section.icon} {section.label}
           </button>

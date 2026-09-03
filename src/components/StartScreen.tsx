@@ -19,6 +19,7 @@ export function StartScreen({ onNew, onOpen, recentFiles, onOpenRecent, onClearR
   const [selectedProdi, setSelectedProdi] = useState('')
   const [selectedMK, setSelectedMK] = useState('')
   const [showNewDialog, setShowNewDialog] = useState(false)
+  const [showRecent, setShowRecent] = useState(false)
 
   const selectedProdiData = prodiData.find(p => p.kode === selectedProdi)
 
@@ -68,6 +69,46 @@ export function StartScreen({ onNew, onOpen, recentFiles, onOpenRecent, onClearR
   const formatDate = (iso: string) => {
     const d = new Date(iso)
     return d.toLocaleDateString('id-ID', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })
+  }
+
+  if (showRecent) {
+    return (
+      <div className="start-screen">
+        <div className="start-cards" style={{ maxWidth: '36rem' }}>
+          <div className="start-card">
+            <div className="flex items-center justify-between mb-4">
+              <h2>📁 Project Terakhir Dibuka</h2>
+              <button onClick={() => setShowRecent(false)} className="btn btn-secondary">
+                ← Kembali
+              </button>
+            </div>
+            {recentFiles.length === 0 ? (
+              <p className="text-gray-500 text-sm">Belum ada project yang dibuka.</p>
+            ) : (
+              <>
+                <div className="flex justify-end mb-3">
+                  <button onClick={onClearRecent} className="btn btn-danger-text text-sm">
+                    Hapus riwayat
+                  </button>
+                </div>
+                <div className="space-y-2">
+                  {recentFiles.map((file) => (
+                    <button
+                      key={file.path}
+                      onClick={() => onOpenRecent(file.path)}
+                      className="recent-item"
+                    >
+                      <div className="recent-item-name">{file.name}</div>
+                      <div className="recent-item-date">Terakhir dibuka: {formatDate(file.openedAt)}</div>
+                    </button>
+                  ))}
+                </div>
+              </>
+            )}
+          </div>
+        </div>
+      </div>
+    )
   }
 
   return (
@@ -147,28 +188,17 @@ export function StartScreen({ onNew, onOpen, recentFiles, onOpenRecent, onClearR
           )}
         </div>
 
-        {/* Recent Files Section */}
+        {/* Recent Files Button */}
         {recentFiles.length > 0 && (
-          <div className="start-card">
-            <div className="flex items-center justify-between mb-4">
-              <h2>Project Terakhir Dibuka</h2>
-              <button onClick={onClearRecent} className="btn btn-danger-text text-sm">
-                Hapus riwayat
-              </button>
+          <button onClick={() => setShowRecent(true)} className="start-card w-full text-left">
+            <div className="flex items-center justify-between">
+              <div>
+                <h2>📁 Project Terakhir</h2>
+                <p className="text-sm text-gray-500 mt-1">{recentFiles.length} project baru dibuka</p>
+              </div>
+              <span className="text-gray-400 text-lg">→</span>
             </div>
-            <div className="space-y-2 max-h-64 overflow-y-auto">
-              {recentFiles.map((file) => (
-                <button
-                  key={file.path}
-                  onClick={() => onOpenRecent(file.path)}
-                  className="recent-item"
-                >
-                  <div className="recent-item-name">{file.name}</div>
-                  <div className="recent-item-date">Terakhir dibuka: {formatDate(file.openedAt)}</div>
-                </button>
-              ))}
-            </div>
-          </div>
+          </button>
         )}
       </div>
 

@@ -5,6 +5,7 @@ import { StartScreen } from './components/StartScreen'
 import { AISettingsDialog } from './components/AISettingsDialog'
 import { ImportDialog } from './components/ImportDialog'
 import { exportDocx, exportPdf } from './services/export'
+import { logger } from './utils/logger'
 
 export interface Project {
   filePath: string | null
@@ -17,7 +18,8 @@ const defaultContent: Record<string, string> = {
   mata_kuliah: '',
   kode_mk: '',
   rumpun_mk: '',
-  sks: '',
+  sks_t: '',
+  sks_p: '',
   semester: '',
   dosen: '',
   semester_akademik: '',
@@ -26,14 +28,35 @@ const defaultContent: Record<string, string> = {
   pengembang_rps: '',
   koordinator_rmk: '',
   kaprodi: '',
-  // CPL, CPMK, Sub-CPMK
-  cpl: '',
-  cpmk: '',
-  sub_cpmk: '',
+  ketua_stikes: '',
+  // CPL, CPMK, Sub-CPMK (structured list: JSON string of {label, deskripsi}[])
+  cpl: JSON.stringify([
+    { label: 'CPL-1', deskripsi: '' },
+    { label: 'CPL-2', deskripsi: '' },
+    { label: 'CPL-3', deskripsi: '' },
+    { label: 'CPL-4', deskripsi: '' },
+  ]),
+  cpmk: JSON.stringify([
+    { label: 'CPMK-1', deskripsi: '' },
+    { label: 'CPMK-2', deskripsi: '' },
+    { label: 'CPMK-3', deskripsi: '' },
+    { label: 'CPMK-4', deskripsi: '' },
+  ]),
+  sub_cpmk: JSON.stringify([
+    { label: 'Sub-CPMK1', cpmk: 'CPMK-1', deskripsi: '' },
+    { label: 'Sub-CPMK2', cpmk: 'CPMK-2', deskripsi: '' },
+    { label: 'Sub-CPMK3', cpmk: 'CPMK-3', deskripsi: '' },
+    { label: 'Sub-CPMK4', cpmk: 'CPMK-4', deskripsi: '' },
+  ]),
   // Deskripsi
   deskripsi_mk: '',
-  // Bahan Kajian
-  bahan_kajian: '',
+  // Bahan Kajian (structured list: JSON string of {label, judul, deskripsi}[])
+  bahan_kajian: JSON.stringify([
+    { label: '1', judul: '', deskripsi: '' },
+    { label: '2', judul: '', deskripsi: '' },
+    { label: '3', judul: '', deskripsi: '' },
+    { label: '4', judul: '', deskripsi: '' },
+  ]),
   // Penilaian
   penilaian: JSON.stringify([
     { item: 'Kehadiran', bobot: 10 },
@@ -50,6 +73,12 @@ const defaultContent: Record<string, string> = {
   matakuliah_syarat: '',
   // Tabel Pertemuan
   pertemuan: '[]',
+  // Identitas Dosen
+  nidn_pengembang: '',
+  nidn_kaprodi: '',
+  nidn_ketua_stikes: '',
+  wakil_ketua_i: '',
+  nidn_wakil_ketua_i: '',
 }
 
 function App() {
@@ -59,22 +88,28 @@ function App() {
   const [showAISettings, setShowAISettings] = useState(false)
   const [showImport, setShowImport] = useState(false)
   const handleNewProject = (content?: Record<string, string>) => {
+    logger.info('APP', 'project.new', { withContent: !!content })
     setProject({ filePath: null, content: content || { ...defaultContent } })
     setShowStart(false)
   }
 
   const handleOpenProject = async () => {
+    logger.info('APP', 'project.open_dialog')
     const result = await window.electronAPI.openFile()
     if (result) {
+      logger.info('APP', 'project.loaded', { filePath: result.filePath })
       setProject({ filePath: result.filePath, content: result.data })
       setShowStart(false)
       window.electronAPI.addRecent(result.filePath)
       loadRecentFiles()
+    } else {
+      logger.debug('APP', 'project.open_canceled')
     }
   }
 
   const handleSaveProject = async () => {
     if (!project) return
+    logger.info('APP', 'project.save', { filePath: project.filePath || 'new' })
     const data = {
       defaultName: project.content.mata_kuliah
         ? `RPS_${project.content.mata_kuliah.replace(/\s+/g, '_')}.rps`
@@ -83,14 +118,18 @@ function App() {
     }
     const savedPath = await window.electronAPI.saveFile(data)
     if (savedPath) {
+      logger.info('APP', 'project.saved', { filePath: savedPath })
       setProject({ ...project, filePath: savedPath })
       window.electronAPI.addRecent(savedPath)
       loadRecentFiles()
+    } else {
+      logger.debug('APP', 'project.save_canceled')
     }
   }
 
   const handleSaveAs = async () => {
     if (!project) return
+    logger.info('APP', 'project.save_as')
     const data = {
       defaultName: project.content.mata_kuliah
         ? `RPS_${project.content.mata_kuliah.replace(/\s+/g, '_')}.rps`
@@ -99,14 +138,18 @@ function App() {
     }
     const savedPath = await window.electronAPI.saveFileAs(data)
     if (savedPath) {
+      logger.info('APP', 'project.saved', { filePath: savedPath })
       setProject({ ...project, filePath: savedPath })
       window.electronAPI.addRecent(savedPath)
       loadRecentFiles()
+    } else {
+      logger.debug('APP', 'project.save_as_canceled')
     }
   }
 
   const handleExport = async (format: 'pdf' | 'docx' = 'pdf') => {
     if (!project) return
+    logger.info('APP', 'project.export', { format })
     const ext = format === 'pdf' ? 'pdf' : 'docx'
     const name = project.content.mata_kuliah
       ? `RPS_${project.content.mata_kuliah.replace(/\s+/g, '_')}.${ext}`
@@ -119,37 +162,44 @@ function App() {
         } else {
           await exportPdf({ content: project.content }, result.filePath)
         }
+        logger.info('APP', 'project.export_complete', { format, filePath: result.filePath })
       } catch (err) {
-        console.error('Export error:', err)
+        logger.error('APP', 'project.export_error', { format, error: (err as Error).message })
         alert('Gagal export: ' + (err as Error).message)
       }
+    } else {
+      logger.debug('APP', 'project.export_canceled', { format })
     }
   }
 
   const handleOpenRecent = async (filePath: string) => {
+    logger.info('APP', 'project.open_recent', { filePath })
     const result = await window.electronAPI.openProject(filePath)
     if (result) {
+      logger.info('APP', 'project.loaded', { filePath: result.filePath })
       setProject({ filePath: result.filePath, content: result.data })
       setShowStart(false)
       loadRecentFiles()
+    } else {
+      logger.error('APP', 'project.open_error', { filePath })
     }
   }
 
   const loadRecentFiles = async () => {
     const recent = await window.electronAPI.getRecent()
     setRecentFiles(recent || [])
+    logger.debug('APP', 'recent_files.loaded', { count: recent?.length || 0 })
   }
 
   useEffect(() => {
     loadRecentFiles()
 
-    window.electronAPI.onMenuNew(() => handleNewProject())
-    window.electronAPI.onMenuSave(() => handleSaveProject())
-    window.electronAPI.onMenuExport(() => handleExport())
-    window.electronAPI.onMenuImport(() => setShowImport(true))
-    window.electronAPI.onOpenAISettings(() => setShowAISettings(true))
+    const unsubNew = window.electronAPI.onMenuNew(() => handleNewProject())
+    const unsubSave = window.electronAPI.onMenuSave(() => handleSaveProject())
+    const unsubExport = window.electronAPI.onMenuExport(() => handleExport())
+    const unsubImport = window.electronAPI.onMenuImport(() => setShowImport(true))
+    const unsubAI = window.electronAPI.onOpenAISettings(() => setShowAISettings(true))
 
-    // Keyboard shortcuts
     const handleKeyDown = (e: KeyboardEvent) => {
       if ((e.ctrlKey || e.metaKey) && e.key === 's') {
         e.preventDefault()
@@ -158,8 +208,15 @@ function App() {
       }
     }
     window.addEventListener('keydown', handleKeyDown)
-    return () => window.removeEventListener('keydown', handleKeyDown)
-  }, [project])
+    return () => {
+      unsubNew()
+      unsubSave()
+      unsubExport()
+      unsubImport()
+      unsubAI()
+      window.removeEventListener('keydown', handleKeyDown)
+    }
+  }, [])
 
   if (showStart) {
     return (
@@ -185,10 +242,14 @@ function App() {
         onSaveAs={handleSaveAs}
         onExport={handleExport}
         onOpenAISettings={() => setShowAISettings(true)}
-        onGoHome={() => setShowStart(true)}
+        onGoHome={() => {
+          logger.info('APP', 'navigate_home')
+          setShowStart(true)
+        }}
       />
       <AISettingsDialog open={showAISettings} onClose={() => setShowAISettings(false)} />
       <ImportDialog open={showImport} onClose={() => setShowImport(false)} onImport={(data) => {
+        logger.info('APP', 'project.import_data', { fields: Object.keys(data) })
         if (project) {
           setProject({ ...project, content: { ...project.content, ...data } })
         }

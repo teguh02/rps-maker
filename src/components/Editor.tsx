@@ -3,6 +3,7 @@ import type { Project } from '../App'
 import { Ribbon } from './Ribbon'
 import { RTE } from './RTE'
 import { isAIConfigured, generateWithAI, getSectionPrompt } from '../services/ai'
+import { logger } from '../utils/logger'
 
 interface EditorProps {
   project: Project
@@ -19,26 +20,60 @@ interface PenilaianItem {
   bobot: number
 }
 
+interface StructuredItem {
+  label: string
+  deskripsi: string
+  cpmk?: string
+  judul?: string
+}
+
 interface PertemuanItem {
   no: number
   subCpmk: string
   indikator: string
   kriteria: string
-  bentukMetode: string
+  bentuk: string
+  metodeOffline: string
+  metodeOnline: string
+  penugasan: string
+  estimasiWaktu: string
   materiPustaka: string
   bobot: number
+  type?: 'regular'
+  label?: string
 }
+
+interface PertemuanSpecial {
+  type: 'uts' | 'uas'
+  no: number
+  label: string
+}
+
+type PertemuanRow = PertemuanItem | PertemuanSpecial
 
 export function Editor({ project, onUpdate, onSave, onSaveAs, onExport, onOpenAISettings, onGoHome }: EditorProps) {
   const [activeSection, setActiveSection] = useState('identitas')
   const [aiLoading, setAiLoading] = useState(false)
   const [aiError, setAiError] = useState('')
+  const [dismissedGuides, setDismissedGuides] = useState<Set<string>>(new Set())
 
   const updateField = (key: string, value: string) => {
+    logger.debug('EDITOR', 'editor.field_update', { field: key })
     onUpdate({ ...project.content, [key]: value })
   }
 
-  // Parse penilaian JSON
+  const getStructuredList = (key: string): StructuredItem[] => {
+    try {
+      return JSON.parse(project.content[key] || '[]')
+    } catch {
+      return []
+    }
+  }
+
+  const updateStructuredList = (key: string, items: StructuredItem[]) => {
+    updateField(key, JSON.stringify(items))
+  }
+
   const getPenilaian = (): PenilaianItem[] => {
     try {
       return JSON.parse(project.content.penilaian || '[]')
@@ -51,8 +86,7 @@ export function Editor({ project, onUpdate, onSave, onSaveAs, onExport, onOpenAI
     updateField('penilaian', JSON.stringify(items))
   }
 
-  // Parse pertemuan JSON
-  const getPertemuan = (): PertemuanItem[] => {
+  const getPertemuan = (): PertemuanRow[] => {
     try {
       return JSON.parse(project.content.pertemuan || '[]')
     } catch {
@@ -60,51 +94,179 @@ export function Editor({ project, onUpdate, onSave, onSaveAs, onExport, onOpenAI
     }
   }
 
-  const updatePertemuan = (items: PertemuanItem[]) => {
+  const updatePertemuan = (items: PertemuanRow[]) => {
     updateField('pertemuan', JSON.stringify(items))
   }
 
-  // Generate pertemuan from Sub-CPMK
+  const updatePertemuanField = (idx: number, field: keyof PertemuanItem, value: string | number) => {
+    const items = [...getPertemuan()]
+    const row = items[idx]
+    if (row && row.type !== 'uts' && row.type !== 'uas') {
+      items[idx] = { ...row, [field]: value } as PertemuanItem
+      updatePertemuan(items)
+    }
+  }
+
   const generatePertemuan = () => {
-    const subCpmkText = project.content.sub_cpmk || ''
-    const subCpmkList = subCpmkText
-      .replace(/<[^>]+>/g, '\n')
-      .split('\n')
-      .map(s => s.trim())
-      .filter(s => s.length > 5)
-
+    logger.info('EDITOR', 'editor.pertemuan.generate')
+    const subCpmkList = getStructuredList('sub_cpmk')
     const existing = getPertemuan()
-    const maxMinggu = Math.max(16, existing.length, subCpmkList.length)
+    const existingItems = existing.filter(e => e.type !== 'uts' && e.type !== 'uas') as PertemuanItem[]
+    const maxMinggu = Math.max(16, existingItems.length, subCpmkList.length)
 
-    const items: PertemuanItem[] = []
+    const items: PertemuanRow[] = []
     for (let i = 1; i <= maxMinggu; i++) {
-      const existingItem = existing.find(e => e.no === i)
-      const subCpmk = subCpmkList[i - 1] || existingItem?.subCpmk || ''
+      const existingItem = existingItems.find(e => e.no === i)
+      const subCpmk = subCpmkList[i - 1]?.deskripsi || existingItem?.subCpmk || ''
       items.push({
         no: i,
-        subCpmk: existingItem?.subCpmk || subCpmk,
+        subCpmk,
         indikator: existingItem?.indikator || '',
         kriteria: existingItem?.kriteria || '',
-        bentukMetode: existingItem?.bentukMetode || '',
+        bentuk: existingItem?.bentuk || '',
+        metodeOffline: existingItem?.metodeOffline || '',
+        metodeOnline: existingItem?.metodeOnline || '',
+        penugasan: existingItem?.penugasan || '',
+        estimasiWaktu: existingItem?.estimasiWaktu || '',
         materiPustaka: existingItem?.materiPustaka || '',
         bobot: existingItem?.bobot || 0,
       })
     }
+    items.splice(8, 0, { type: 'uts', no: 0, label: 'Evaluasi Tengah Semester (UTS)' })
+    items.splice(17, 0, { type: 'uas', no: 0, label: 'Evaluasi Akhir Semester (UAS)' })
+    logger.debug('EDITOR', 'editor.pertemuan.generated', { rowCount: items.length })
     updatePertemuan(items)
   }
 
-  // Extract Sub-CPMK list for auto-fill
   const getSubCpmkList = (): string[] => {
-    const text = project.content.sub_cpmk || ''
-    return text
-      .replace(/<[^>]+>/g, '\n')
-      .split('\n')
-      .map(s => s.trim())
-      .filter(s => s.length > 5)
+    return getStructuredList('sub_cpmk').map(s => s.deskripsi)
+  }
+
+  const StructuredList = ({
+    listKey,
+    prefix,
+    items,
+    onChange,
+    showCpmkRef = false,
+    showJudul = true,
+  }: {
+    listKey: string
+    prefix: string
+    items: StructuredItem[]
+    onChange: (items: StructuredItem[]) => void
+    showCpmkRef?: boolean
+    showJudul?: boolean
+  }) => {
+    const addItem = () => {
+      const newItems = [...items]
+      let label = ''
+      if (prefix === 'Sub-CPMK') {
+        label = `${prefix}${newItems.length + 1}`
+      } else if (prefix === 'CPL') {
+        label = `${prefix}-${newItems.length + 1}`
+      } else if (prefix === 'CPMK') {
+        label = `${prefix}-${newItems.length + 1}`
+      } else {
+        label = String(newItems.length + 1)
+      }
+      newItems.push({ label, deskripsi: '', cpmk: '', judul: '' })
+      logger.debug('EDITOR', 'editor.structured_list.add', { listKey, newCount: newItems.length })
+      onChange(newItems)
+    }
+
+    const removeItem = (idx: number) => {
+      const newItems = items.filter((_, i) => i !== idx)
+      logger.debug('EDITOR', 'editor.structured_list.remove', { listKey, index: idx, remaining: newItems.length })
+      onChange(newItems)
+    }
+
+    const updateDeskripsi = (idx: number, deskripsi: string) => {
+      const newItems = [...items]
+      newItems[idx] = { ...newItems[idx], deskripsi }
+      onChange(newItems)
+    }
+
+    const updateJudul = (idx: number, judul: string) => {
+      const newItems = [...items]
+      newItems[idx] = { ...newItems[idx], judul }
+      onChange(newItems)
+    }
+
+    const updateLabel = (idx: number, label: string) => {
+      const newItems = [...items]
+      newItems[idx] = { ...newItems[idx], label }
+      onChange(newItems)
+    }
+
+    return (
+      <div>
+        <table className="w-full">
+          <thead>
+            <tr className="bg-gray-50">
+              <th className="text-left text-sm font-medium text-gray-700 p-2 w-28">Label</th>
+              {showJudul && <th className="text-left text-sm font-medium text-gray-700 p-2 w-48">Judul</th>}
+              <th className="text-left text-sm font-medium text-gray-700 p-2">Deskripsi</th>
+              <th className="text-left text-sm font-medium text-gray-700 p-2 w-16">Aksi</th>
+            </tr>
+          </thead>
+          <tbody>
+            {items.map((item, idx) => (
+              <tr key={idx} className="border-t">
+                <td className="p-2">
+                  <input
+                    type="text"
+                    value={item.label || ''}
+                    onChange={(e) => updateLabel(idx, e.target.value)}
+                    placeholder={prefix === 'Sub-CPMK' ? `${prefix}${idx + 1}` : prefix === 'CPL' ? `CPL-${idx + 1}` : prefix === 'CPMK' ? `CPMK-${idx + 1}` : String(idx + 1)}
+                    className="w-full px-2 py-1 text-sm font-medium border border-transparent hover:border-gray-300 focus:border-blue-500 focus:outline-none rounded"
+                  />
+                </td>
+                {showJudul && (
+                  <td className="p-2">
+                    <input
+                      type="text"
+                      value={item.judul || ''}
+                      onChange={(e) => updateJudul(idx, e.target.value)}
+                      placeholder="Judul"
+                      className="w-full px-2 py-1 text-sm border border-transparent hover:border-gray-300 focus:border-blue-500 focus:outline-none rounded"
+                    />
+                  </td>
+                )}
+                <td className="p-2">
+                  <textarea
+                    value={item.deskripsi}
+                    onChange={(e) => updateDeskripsi(idx, e.target.value)}
+                    placeholder={`Deskripsi ${item.label || prefix}${idx + 1}...`}
+                    className="w-full px-2 py-1 text-sm border border-transparent hover:border-gray-300 focus:border-blue-500 focus:outline-none rounded resize-none"
+                    rows={2}
+                  />
+                </td>
+                <td className="p-2">
+                  <button
+                    onClick={() => removeItem(idx)}
+                    className="text-red-500 hover:text-red-700 text-sm"
+                    title="Hapus"
+                  >
+                    Hapus
+                  </button>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+        <button
+          onClick={addItem}
+          className="w-full text-left text-sm text-blue-600 hover:text-blue-800 py-2 px-2"
+        >
+          + Tambah {prefix}
+        </button>
+      </div>
+    )
   }
 
   const sections = [
-    { id: 'identitas', label: 'Cover' },
+    { id: 'cover', label: 'Cover' },
+    { id: 'identitas', label: 'Identitas' },
     { id: 'otorisasi', label: 'Otorisasi' },
     { id: 'cpl', label: 'CPL' },
     { id: 'cpmk', label: 'CPMK' },
@@ -115,93 +277,172 @@ export function Editor({ project, onUpdate, onSave, onSaveAs, onExport, onOpenAI
     { id: 'pustaka', label: 'Pustaka' },
     { id: 'dosen_prasyarat', label: 'Dosen & Syarat' },
     { id: 'pertemuan', label: 'Pertemuan' },
+    { id: 'ttd', label: 'Pengesahan' },
   ]
 
   const sectionGuides: Record<string, string> = {
+    cover: '💡 Ini adalah preview cover RPS. Data diambil dari tab Identitas.',
     identitas: '💡 Isi data identitas mata kuliah sesuai kurikulum program studi.',
     otorisasi: '💡 Otorisasi diisi oleh Kaprodi dan Koordinator RMK. Dosen pengisi adalah Pengembang RPS.',
     cpl: '💡 CPL ditetapkan oleh program studi dari kurikulum. Tidak boleh dihapus, tapi bisa ditambah.',
     cpmk: '💡 CPMK harus terukur. Gunakan KKO Bloom: Mengidentifikasi (C2), Menganalisis (C4), Mencipta (C6).',
-    sub_cpmk: '💡 Pecah CPMK menjadi unit-unit kecil yang bisa diselesaikan dalam 1-2 pertemuan.',
+    sub_cpmk: '💡 Pecah CPMK menjadi unit-unit kecil yang bisa diselesaikan dalam 1-2 pertemuan. Pilih CPMK induk.',
     deskripsi_mk: '💡 Deskripsikan cakupan materi dan relevansi mata kuliah secara singkat (3-5 kalimat).',
     bahan_kajian: '💡 Tuliskan bahan kajian utama yang harus dikuasai mahasiswa.',
     penilaian: '💡 Format penilaian fleksibel. Bobot total harus 100%. IKU 7: minimal 50% asesmen partisipatif.',
     pustaka: '💡 Pustaka utama minimal 2 buku. Referensi harus terkini (max 5 tahun terakhir).',
     dosen_prasyarat: '💡 Tuliskan nama dosen pengampu dan mata kuliah prasyarat (jika ada).',
     pertemuan: '💡 Klik "Generate dari Sub-CPMK" untuk mengisi otomatis, lalu lengkapi kolom lainnya.',
+    ttd: '💡 Tanda tangan pengesahan RPS. Isi otomatis dari data Identitas Dosen (Profil).',
+  }
+
+  const validateSectionDeps = (section: string): string | null => {
+    const c = project.content
+    const deps: Record<string, { label: string; check: () => boolean }[]> = {
+      cpl: [{ label: 'Program Studi', check: () => !!c.prodi }],
+      cpmk: [{ label: 'CPL', check: () => !!c.cpl }],
+      sub_cpmk: [{ label: 'CPMK', check: () => !!c.cpmk }],
+      deskripsi_mk: [{ label: 'Mata Kuliah', check: () => !!c.mata_kuliah }],
+      bahan_kajian: [{ label: 'CPMK', check: () => !!c.cpmk }],
+      penilaian: [{ label: 'CPMK', check: () => !!c.cpmk }],
+      pustaka: [{ label: 'Mata Kuliah', check: () => !!c.mata_kuliah }],
+    }
+    const missing = deps[section]?.filter(d => !d.check()).map(d => d.label)
+    if (missing && missing.length > 0) {
+      return `Harap isi ${missing.join(', ')} terlebih dahulu sebagai acuan AI.`
+    }
+    return null
   }
 
   const handleAIGenerate = async (section: string) => {
+    logger.info('EDITOR', 'editor.ai_generate_clicked', { section })
     if (!isAIConfigured()) {
+      logger.warn('EDITOR', 'editor.ai_not_configured', { section })
       setAiError('AI belum dikonfigurasi. Buka Settings untuk mengatur.')
       return
     }
+    const depError = validateSectionDeps(section)
+    if (depError) {
+      setAiError(depError)
+      return
+    }
+    logger.info('EDITOR', 'editor.ai_generate_start', { section })
     setAiLoading(true)
     setAiError('')
+    const startTime = Date.now()
     try {
       const opts = getSectionPrompt(section, project.content)
       const result = await generateWithAI(opts)
-      updateField(section, result)
+      
+      // Penilaian needs JSON parsing
+      if (section === 'penilaian') {
+        try {
+          const parsed = JSON.parse(result)
+          if (Array.isArray(parsed)) {
+            updatePenilaian(parsed)
+          } else {
+            updateField(section, result)
+          }
+        } catch {
+          updateField(section, result)
+        }
+      // Pustaka has two fields
+      } else if (section === 'pustaka') {
+        try {
+          const parsed = JSON.parse(result)
+          if (parsed.pustaka_utama) updateField('pustaka_utama', parsed.pustaka_utama)
+          if (parsed.pustaka_pendukung) updateField('pustaka_pendukung', parsed.pustaka_pendukung)
+        } catch {
+          updateField('pustaka_utama', result)
+        }
+      } else {
+        updateField(section, result)
+      }
+      
+      const duration = ((Date.now() - startTime) / 1000).toFixed(1)
+      logger.info('EDITOR', 'editor.ai_generate_end', { section, duration, success: true })
     } catch (err) {
+      const duration = ((Date.now() - startTime) / 1000).toFixed(1)
+      logger.error('EDITOR', 'editor.ai_generate_error', { section, error: (err as Error).message, duration })
       setAiError((err as Error).message)
     } finally {
       setAiLoading(false)
     }
   }
 
+  const monthNames: Record<string, string> = {
+    '01': 'JANUARI', '02': 'FEBRUARI', '03': 'MARET', '04': 'APRIL',
+    '05': 'MEI', '06': 'JUNI', '07': 'JULI', '08': 'AGUSTUS',
+    '09': 'SEPTEMBER', '10': 'OKTOBER', '11': 'NOVEMBER', '12': 'DESEMBER',
+  }
+
+  const formatCoverDate = (dateStr: string) => {
+    if (!dateStr) return 'BULAN TAHUN'
+    const parts = dateStr.split('-')
+    if (parts.length === 3) {
+      const month = monthNames[parts[1]] || parts[1]
+      return `${month}, ${parts[0]}`
+    }
+    return dateStr
+  }
+
   const c = project.content
+
+  const dismissGuide = (sectionId: string) => {
+    logger.debug('EDITOR', 'editor.guide_dismiss', { section: sectionId })
+    setDismissedGuides(prev => new Set(prev).add(sectionId))
+  }
+
+  const handleSectionSwitch = (sectionId: string) => {
+    if (activeSection !== sectionId) {
+      logger.info('EDITOR', 'editor.section_switch', { from: activeSection, to: sectionId })
+      setActiveSection(sectionId)
+    }
+  }
 
   return (
     <div className="flex-1 flex flex-col overflow-hidden">
-      <Ribbon onSave={onSave} onSaveAs={onSaveAs} onExport={onExport} onOpenAISettings={onOpenAISettings} onGoHome={onGoHome} />
+      <Ribbon
+        onSave={onSave}
+        onSaveAs={onSaveAs}
+        onExport={onExport}
+        onOpenAISettings={onOpenAISettings}
+        onGoHome={onGoHome}
+        activeSection={activeSection}
+        onGenerateAI={() => handleAIGenerate(activeSection)}
+        aiLoading={aiLoading}
+      />
 
-      <div className="flex-1 overflow-y-auto bg-[#e8e8e8]">
-        <div className="paper-canvas">
-          {/* === COVER PAGE (Identitas tab) === */}
-          {activeSection === 'identitas' && (
+      <div className="flex-1 overflow-y-auto bg-[#e8e8e8] flex flex-col items-center">
+        {/* Section Guide - above canvas */}
+        {sectionGuides[activeSection] && !dismissedGuides.has(activeSection) && (
+          <div className={`section-guide-alert ${activeSection === 'cover' ? 'w-cover' : 'w-landscape'}`}>
+            <span className="section-guide-text">{sectionGuides[activeSection]}</span>
+            <button onClick={() => dismissGuide(activeSection)} className="section-guide-close">&times;</button>
+          </div>
+        )}
+
+        <div className={`paper-canvas ${activeSection === 'cover' ? '' : 'landscape'}`}>
+          {/* === COVER PAGE === */}
+          {activeSection === 'cover' && (
             <div className="rps-cover">
               <div className="rps-cover-title">
                 <p><strong>RENCANA PEMBELAJARAN SEMESTER (RPS)</strong></p>
                 <p><strong>{c.semester === 'Ganjil' ? 'GANJIL' : c.semester === 'Genap' ? 'GENAP' : 'GANJIL/GENAP'}</strong></p>
                 <p><strong>{c.semester_akademik || 'TAHUN AKADEMIK 20__-20__'}</strong></p>
-                <p><strong>{c.mata_kuliah || 'MATAKULIAH'} ({c.kode_mk || 'KODE'})</strong></p>
+                <p><strong>{c.mata_kuliah || 'MATAKULIAH'} ({c.kode_mk || 'KODE MATAKULIAH'})</strong></p>
+                <p><strong>PRODI {c.prodi || 'PROGRAM STUDI'}</strong></p>
               </div>
               <div className="rps-cover-logo">
-                <img src="./logo-unisina.png" alt="Logo UNISINA" className="w-48 h-48 object-contain" />
+                <img src="./logo-unisina.png" alt="Logo STIKes" className="w-48 h-48 object-contain" />
                 <p><strong>Disusun Oleh :</strong></p>
+                {c.pengembang_rps && <p><strong>{c.pengembang_rps}</strong></p>}
+                {c.nidn_pengembang && <p>NIDN. {c.nidn_pengembang}</p>}
               </div>
               <div className="rps-cover-footer">
-                <p><strong>UNIVERSITAS IBNU SINA AJIBARANG</strong></p>
-                <p><strong>{c.semester_akademik || 'TAHUN AKADEMIK 20__-20__'}</strong></p>
+                <p><strong>STIKes IBNU SINA AJIBARANG</strong></p>
+                <p><strong>{formatCoverDate(c.tgl_penyusunan)}</strong></p>
               </div>
-            </div>
-          )}
-
-          {/* === MAIN RPS HEADER (other tabs) === */}
-          {activeSection !== 'identitas' && (
-            <div className="rps-main-header">
-              <table className="rps-header-table">
-                <tbody>
-                  <tr>
-                    <td colSpan={2} className="rps-header-logo">
-                      <img src="./logo-unisina.png" alt="Logo UNISINA" className="w-16 h-16 object-contain" />
-                    </td>
-                    <td colSpan={10} className="rps-header-info">
-                      <p><strong>UNIVERSITAS IBNU SINA AJIBARANG</strong></p>
-                      <p><strong>{c.prodi || 'PROGRAM STUDI'}</strong></p>
-                      <p><strong>{c.semester_akademik || 'TAHUN AJARAN 20__-20__'}</strong></p>
-                    </td>
-                    <td colSpan={2} className="rps-header-code">
-                      <p><strong>RPS/{c.prodi?.replace(/\s+/g, '').toUpperCase() || 'PRODI'}/{c.semester || 'GANJIL'}/{c.tgl_penyusunan?.split('-')[0] || '20__'}</strong></p>
-                    </td>
-                  </tr>
-                  <tr>
-                    <td colSpan={14} className="rps-header-title">
-                      <p><strong>RENCANA PEMBELAJARAN SEMESTER</strong></p>
-                    </td>
-                  </tr>
-                </tbody>
-              </table>
             </div>
           )}
 
@@ -216,10 +457,10 @@ export function Editor({ project, onUpdate, onSave, onSaveAs, onExport, onOpenAI
                     ['mata_kuliah', 'Mata Kuliah (MK)'],
                     ['kode_mk', 'Kode'],
                     ['rumpun_mk', 'Rumpun MK'],
-                    ['sks', 'Bobot (SKS)'],
+                    ['sks_t', 'Bobot SKS Teori (T)'],
+                    ['sks_p', 'Bobot SKS Praktik (P)'],
                     ['semester', 'Semester'],
                     ['tgl_penyusunan', 'Tanggal Penyusunan'],
-                    ['semester_akademik', 'Semester Akademik'],
                   ].map(([key, label]) => (
                     <tr key={key}>
                       <td className="w-56 font-medium text-gray-700">{label}</td>
@@ -235,9 +476,6 @@ export function Editor({ project, onUpdate, onSave, onSaveAs, onExport, onOpenAI
                   ))}
                 </tbody>
               </table>
-              <div className="section-guide mt-4">
-                {sectionGuides.identitas}
-              </div>
             </section>
           )}
 
@@ -249,8 +487,14 @@ export function Editor({ project, onUpdate, onSave, onSaveAs, onExport, onOpenAI
                 <tbody>
                   {[
                     ['pengembang_rps', 'Pengembang RPS (Dosen)'],
+                    ['nidn_pengembang', 'NIDN Pengembang RPS'],
                     ['koordinator_rmk', 'Koordinator RMK'],
                     ['kaprodi', 'Ketua Program Studi'],
+                    ['nidn_kaprodi', 'NIDN Kaprodi'],
+                    ['ketua_stikes', 'Ketua STIKes Ibnu Sina Ajibarang'],
+                    ['nidn_ketua_stikes', 'NIDN Ketua STIKes'],
+                    ['wakil_ketua_i', 'Wakil Ketua I Bidang Akademik'],
+                    ['nidn_wakil_ketua_i', 'NIDN Wakil Ketua I'],
                   ].map(([key, label]) => (
                     <tr key={key}>
                       <td className="w-56 font-medium text-gray-700">{label}</td>
@@ -266,102 +510,77 @@ export function Editor({ project, onUpdate, onSave, onSaveAs, onExport, onOpenAI
                   ))}
                 </tbody>
               </table>
-              <div className="section-guide mt-4">
-                {sectionGuides.otorisasi}
-              </div>
             </section>
           )}
 
           {/* === CPL === */}
           {activeSection === 'cpl' && (
             <section className="editor-content">
-              <div className="flex items-center justify-between mb-4">
-                <h2 className="text-lg font-bold">III. CAPAIAN PEMBELAJARAN LULUSAN (CPL)</h2>
-                <button onClick={() => handleAIGenerate('cpl')} disabled={aiLoading} className="btn-ai">
-                  {aiLoading ? 'Generating...' : 'Generate via AI'}
-                </button>
-              </div>
+              <h2 className="text-lg font-bold mb-4">III. CAPAIAN PEMBELAJARAN LULUSAN (CPL)</h2>
               <p className="text-sm text-gray-500 mb-3">CPL-Prodi yang dibebankan pada mata kuliah ini:</p>
-              <RTE
-                content={c.cpl || ''}
-                onUpdate={(html) => updateField('cpl', html)}
-                placeholder="Tuliskan CPL Prodi yang dibebankan pada MK ini..."
+              <StructuredList
+                listKey="cpl"
+                prefix="CPL"
+                items={getStructuredList('cpl')}
+                onChange={(items) => updateStructuredList('cpl', items)}
+                showJudul={false}
               />
-              <div className="section-guide mt-4">{sectionGuides.cpl}</div>
             </section>
           )}
 
           {/* === CPMK === */}
           {activeSection === 'cpmk' && (
             <section className="editor-content">
-              <div className="flex items-center justify-between mb-4">
-                <h2 className="text-lg font-bold">IV. CAPAIAN PEMBELAJARAN MATA KULIAH (CPMK)</h2>
-                <button onClick={() => handleAIGenerate('cpmk')} disabled={aiLoading} className="btn-ai">
-                  {aiLoading ? 'Generating...' : 'Generate via AI'}
-                </button>
-              </div>
+              <h2 className="text-lg font-bold mb-4">IV. CAPAIAN PEMBELAJARAN MATA KULIAH (CPMK)</h2>
               <p className="text-sm text-gray-500 mb-3">CPMK merupakan turunan/uraian spesifik dari CPL-Prodi:</p>
-              <RTE
-                content={c.cpmk || ''}
-                onUpdate={(html) => updateField('cpmk', html)}
-                placeholder="Tuliskan CPMK..."
+              <StructuredList
+                listKey="cpmk"
+                prefix="CPMK"
+                items={getStructuredList('cpmk')}
+                onChange={(items) => updateStructuredList('cpmk', items)}
+                showJudul={false}
               />
-              <div className="section-guide mt-4">{sectionGuides.cpmk}</div>
             </section>
           )}
 
           {/* === SUB-CPMK === */}
           {activeSection === 'sub_cpmk' && (
             <section className="editor-content">
-              <div className="flex items-center justify-between mb-4">
-                <h2 className="text-lg font-bold">V. KEMAMPUAN AKHIR TIAP TAHAPAN BELAJAR (SUB-CPMK)</h2>
-                <button onClick={() => handleAIGenerate('sub_cpmk')} disabled={aiLoading} className="btn-ai">
-                  {aiLoading ? 'Generating...' : 'Generate via AI'}
-                </button>
-              </div>
-              <RTE
-                content={c.sub_cpmk || ''}
-                onUpdate={(html) => updateField('sub_cpmk', html)}
-                placeholder="Tuliskan Sub-CPMK (kemampuan akhir tiap tahapan belajar)..."
+              <h2 className="text-lg font-bold mb-4">V. KEMAMPUAN AKHIR TIAP TAHAPAN BELAJAR (SUB-CPMK)</h2>
+              <StructuredList
+                listKey="sub_cpmk"
+                prefix="Sub-CPMK"
+                items={getStructuredList('sub_cpmk')}
+                onChange={(items) => updateStructuredList('sub_cpmk', items)}
+                showJudul={false}
               />
-              <div className="section-guide mt-4">{sectionGuides.sub_cpmk}</div>
             </section>
           )}
 
           {/* === DESKRIPSI MK === */}
           {activeSection === 'deskripsi_mk' && (
             <section className="editor-content">
-              <div className="flex items-center justify-between mb-4">
-                <h2 className="text-lg font-bold">VI. DESKRIPSI SINGKAT MATA KULIAH</h2>
-                <button onClick={() => handleAIGenerate('deskripsi_mk')} disabled={aiLoading} className="btn-ai">
-                  {aiLoading ? 'Generating...' : 'Generate via AI'}
-                </button>
-              </div>
+              <h2 className="text-lg font-bold mb-4">VI. DESKRIPSI SINGKAT MATA KULIAH</h2>
               <p className="text-sm text-gray-500 mb-3">Tuliskan relevansi dan cakupan materi/bahan kajian secara singkat:</p>
               <RTE
                 content={c.deskripsi_mk || ''}
                 onUpdate={(html) => updateField('deskripsi_mk', html)}
                 placeholder="Deskripsikan mata kuliah ini dalam 3-5 kalimat..."
               />
-              <div className="section-guide mt-4">{sectionGuides.deskripsi_mk}</div>
             </section>
           )}
 
           {/* === BAHAN KAJIAN === */}
           {activeSection === 'bahan_kajian' && (
             <section className="editor-content">
-              <div className="flex items-center justify-between mb-4">
-                <h2 className="text-lg font-bold">VII. BAHAN KAJIAN / MATERI PEMBELAJARAN</h2>
-                <button onClick={() => handleAIGenerate('bahan_kajian')} disabled={aiLoading} className="btn-ai">
-                  {aiLoading ? 'Generating...' : 'Generate via AI'}
-                </button>
-              </div>
-              <RTE
-                content={c.bahan_kajian || ''}
-                onUpdate={(html) => updateField('bahan_kajian', html)}
-                placeholder="Tuliskan bahan kajian dan dijabarkan dalam materi pembelajaran..."
+              <h2 className="text-lg font-bold mb-4">VII. BAHAN KAJIAN / MATERI PEMBELAJARAN</h2>
+              <StructuredList
+                listKey="bahan_kajian"
+                prefix="Bahan Kajian"
+                items={getStructuredList('bahan_kajian')}
+                onChange={(items) => updateStructuredList('bahan_kajian', items)}
+                showJudul={false}
               />
-              <div className="section-guide mt-4">{sectionGuides.bahan_kajian}</div>
             </section>
           )}
 
@@ -419,6 +638,7 @@ export function Editor({ project, onUpdate, onSave, onSaveAs, onExport, onOpenAI
                           <button
                             onClick={() => {
                               const items = getPenilaian().filter((_, i) => i !== idx)
+                              logger.debug('EDITOR', 'editor.penilaian.remove', { index: idx, remaining: items.length })
                               updatePenilaian(items)
                             }}
                             className="text-red-500 hover:text-red-700 text-sm"
@@ -432,14 +652,15 @@ export function Editor({ project, onUpdate, onSave, onSaveAs, onExport, onOpenAI
                 </table>
                 <button
                   onClick={() => {
-                    updatePenilaian([...getPenilaian(), { item: '', bobot: 0 }])
+                    const items = [...getPenilaian(), { item: '', bobot: 0 }]
+                    logger.debug('EDITOR', 'editor.penilaian.add', { itemCount: items.length })
+                    updatePenilaian(items)
                   }}
                   className="mt-2 text-sm text-blue-600 hover:text-blue-800"
                 >
                   + Tambah Komponen
                 </button>
               </div>
-              <div className="section-guide mt-4">{sectionGuides.penilaian}</div>
             </section>
           )}
 
@@ -463,7 +684,6 @@ export function Editor({ project, onUpdate, onSave, onSaveAs, onExport, onOpenAI
                   placeholder="Tuliskan pustaka pendukung jika ada..."
                 />
               </div>
-              <div className="section-guide mt-4">{sectionGuides.pustaka}</div>
             </section>
           )}
 
@@ -497,7 +717,6 @@ export function Editor({ project, onUpdate, onSave, onSaveAs, onExport, onOpenAI
                   </tr>
                 </tbody>
               </table>
-              <div className="section-guide mt-4">{sectionGuides.dosen_prasyarat}</div>
             </section>
           )}
 
@@ -511,132 +730,186 @@ export function Editor({ project, onUpdate, onSave, onSaveAs, onExport, onOpenAI
                 </button>
               </div>
               <div className="overflow-x-auto">
-                <table className="w-full text-sm">
+                <table className="w-full text-sm" style={{ minWidth: '1600px' }}>
                   <thead>
                     <tr className="bg-gray-100">
                       <th className="border p-2 w-10">No</th>
-                      <th className="border p-2 w-48">Sub-CPMK</th>
-                      <th className="border p-2 w-40">Indikator</th>
-                      <th className="border p-2 w-40">Kriteria & Teknik</th>
-                      <th className="border p-2 w-40">Bentuk/Metode/PM</th>
-                      <th className="border p-2 w-40">Materi [Pustaka]</th>
-                      <th className="border p-2 w-16">Bobot (%)</th>
+                      <th className="border p-2 w-40">Kemampuan Akhir</th>
+                      <th className="border p-2 w-36">Indikator</th>
+                      <th className="border p-2 w-36">Kriteria</th>
+                      <th className="border p-2 w-28">Bentuk</th>
+                      <th className="border p-2 w-28">Luring</th>
+                      <th className="border p-2 w-28">Daring</th>
+                      <th className="border p-2 w-32">Penugasan</th>
+                      <th className="border p-2 w-20">Waktu</th>
+                      <th className="border p-2 w-40">Materi</th>
+                      <th className="border p-2 w-16">Bobot</th>
                     </tr>
                   </thead>
                   <tbody>
-                    {getPertemuan().map((item, idx) => (
-                      <tr key={idx}>
-                        <td className="border p-1 text-center text-gray-500">{item.no}</td>
-                        <td className="border p-1">
-                          <textarea
-                            value={item.subCpmk}
-                            onChange={(e) => {
-                              const items = [...getPertemuan()]
-                              items[idx].subCpmk = e.target.value
-                              updatePertemuan(items)
-                            }}
-                            className="w-full px-1 py-0.5 text-xs border-0 focus:outline-none resize-none"
-                            rows={2}
-                          />
-                        </td>
-                        <td className="border p-1">
-                          <textarea
-                            value={item.indikator}
-                            onChange={(e) => {
-                              const items = [...getPertemuan()]
-                              items[idx].indikator = e.target.value
-                              updatePertemuan(items)
-                            }}
-                            className="w-full px-1 py-0.5 text-xs border-0 focus:outline-none resize-none"
-                            rows={2}
-                          />
-                        </td>
-                        <td className="border p-1">
-                          <textarea
-                            value={item.kriteria}
-                            onChange={(e) => {
-                              const items = [...getPertemuan()]
-                              items[idx].kriteria = e.target.value
-                              updatePertemuan(items)
-                            }}
-                            className="w-full px-1 py-0.5 text-xs border-0 focus:outline-none resize-none"
-                            rows={2}
-                          />
-                        </td>
-                        <td className="border p-1">
-                          <textarea
-                            value={item.bentukMetode}
-                            onChange={(e) => {
-                              const items = [...getPertemuan()]
-                              items[idx].bentukMetode = e.target.value
-                              updatePertemuan(items)
-                            }}
-                            className="w-full px-1 py-0.5 text-xs border-0 focus:outline-none resize-none"
-                            rows={2}
-                          />
-                        </td>
-                        <td className="border p-1">
-                          <textarea
-                            value={item.materiPustaka}
-                            onChange={(e) => {
-                              const items = [...getPertemuan()]
-                              items[idx].materiPustaka = e.target.value
-                              updatePertemuan(items)
-                            }}
-                            className="w-full px-1 py-0.5 text-xs border-0 focus:outline-none resize-none"
-                            rows={2}
-                          />
-                        </td>
-                        <td className="border p-1">
-                          <input
-                            type="number"
-                            value={item.bobot}
-                            onChange={(e) => {
-                              const items = [...getPertemuan()]
-                              items[idx].bobot = parseInt(e.target.value) || 0
-                              updatePertemuan(items)
-                            }}
-                            className="w-full px-1 py-0.5 text-xs border-0 focus:outline-none text-center"
-                            min="0"
-                            max="100"
-                          />
-                        </td>
-                      </tr>
-                    ))}
+                    {getPertemuan().map((row, idx) => {
+                      if (row.type === 'uts' || row.type === 'uas') {
+                        return (
+                          <tr key={idx} className="bg-gray-50">
+                            <td className="border p-2 text-center text-gray-500" colSpan={11}>
+                              <strong>{row.label}</strong>
+                            </td>
+                          </tr>
+                        )
+                      }
+                      const item = row as PertemuanItem
+                      return (
+                        <tr key={idx}>
+                          <td className="border p-1 text-center text-gray-500">{item.no}</td>
+                          <td className="border p-1">
+                            <textarea
+                              value={item.subCpmk}
+                              onChange={(e) => updatePertemuanField(idx, 'subCpmk', e.target.value)}
+                              className="w-full px-1 py-0.5 text-xs border-0 focus:outline-none resize-none"
+                              rows={2}
+                            />
+                          </td>
+                          <td className="border p-1">
+                            <textarea
+                              value={item.indikator}
+                              onChange={(e) => updatePertemuanField(idx, 'indikator', e.target.value)}
+                              className="w-full px-1 py-0.5 text-xs border-0 focus:outline-none resize-none"
+                              rows={2}
+                            />
+                          </td>
+                          <td className="border p-1">
+                            <textarea
+                              value={item.kriteria}
+                              onChange={(e) => updatePertemuanField(idx, 'kriteria', e.target.value)}
+                              className="w-full px-1 py-0.5 text-xs border-0 focus:outline-none resize-none"
+                              rows={2}
+                            />
+                          </td>
+                          <td className="border p-1">
+                            <textarea
+                              value={item.bentuk}
+                              onChange={(e) => updatePertemuanField(idx, 'bentuk', e.target.value)}
+                              className="w-full px-1 py-0.5 text-xs border-0 focus:outline-none resize-none"
+                              rows={2}
+                            />
+                          </td>
+                          <td className="border p-1">
+                            <textarea
+                              value={item.metodeOffline}
+                              onChange={(e) => updatePertemuanField(idx, 'metodeOffline', e.target.value)}
+                              className="w-full px-1 py-0.5 text-xs border-0 focus:outline-none resize-none"
+                              rows={2}
+                            />
+                          </td>
+                          <td className="border p-1">
+                            <textarea
+                              value={item.metodeOnline}
+                              onChange={(e) => updatePertemuanField(idx, 'metodeOnline', e.target.value)}
+                              className="w-full px-1 py-0.5 text-xs border-0 focus:outline-none resize-none"
+                              rows={2}
+                            />
+                          </td>
+                          <td className="border p-1">
+                            <textarea
+                              value={item.penugasan}
+                              onChange={(e) => updatePertemuanField(idx, 'penugasan', e.target.value)}
+                              className="w-full px-1 py-0.5 text-xs border-0 focus:outline-none resize-none"
+                              rows={2}
+                            />
+                          </td>
+                          <td className="border p-1">
+                            <input
+                              type="text"
+                              value={item.estimasiWaktu}
+                              onChange={(e) => updatePertemuanField(idx, 'estimasiWaktu', e.target.value)}
+                              className="w-full px-1 py-0.5 text-xs border-0 focus:outline-none"
+                              placeholder="2x50'"
+                            />
+                          </td>
+                          <td className="border p-1">
+                            <textarea
+                              value={item.materiPustaka}
+                              onChange={(e) => updatePertemuanField(idx, 'materiPustaka', e.target.value)}
+                              className="w-full px-1 py-0.5 text-xs border-0 focus:outline-none resize-none"
+                              rows={2}
+                            />
+                          </td>
+                          <td className="border p-1">
+                            <input
+                              type="number"
+                              value={item.bobot}
+                              onChange={(e) => updatePertemuanField(idx, 'bobot', parseInt(e.target.value) || 0)}
+                              className="w-full px-1 py-0.5 text-xs border-0 focus:outline-none text-center"
+                              min="0"
+                              max="100"
+                            />
+                          </td>
+                        </tr>
+                      )
+                    })}
                   </tbody>
                 </table>
               </div>
-              <div className="section-guide mt-4">{sectionGuides.pertemuan}</div>
             </section>
           )}
 
-          {/* Signature block */}
-          <section className="signature-block border-t">
-            <div>
-              <p className="text-sm text-gray-500 mb-1">Dibuat oleh:</p>
-              <div className="h-16"></div>
-              <div className="border-t w-48"></div>
-              <p className="mt-1 text-sm font-medium">{c.pengembang_rps || '.........................'}</p>
-              <p className="text-xs text-gray-500">Pengembang RPS</p>
-            </div>
-            <div>
-              <p className="text-sm text-gray-500 mb-1">Mengetahui:</p>
-              <div className="flex gap-8">
-                <div className="text-center">
-                  <div className="h-16"></div>
-                  <div className="border-t w-36"></div>
-                  <p className="mt-1 text-sm font-medium">{c.kaprodi || '.........................'}</p>
-                  <p className="text-xs text-gray-500">Kaprodi</p>
-                </div>
-                <div className="text-center">
-                  <div className="h-16"></div>
-                  <div className="border-t w-36"></div>
-                  <p className="mt-1 text-sm font-medium">Ketua STIKes</p>
-                  <p className="text-xs text-gray-500">Ibnu Sina Ajibarang</p>
-                </div>
-              </div>
-            </div>
-          </section>
+          {/* === TANDA TANGAN === */}
+          {activeSection === 'ttd' && (
+            <section className="editor-content">
+              <h2 className="text-lg font-bold mb-4">XII. PENGESAHAN</h2>
+              <p className="text-sm text-gray-500 mb-4">Menyetujui dan mengetahui Rencana Pembelajaran Semester ini:</p>
+              <table className="w-full border-collapse" style={{ tableLayout: 'fixed' }}>
+                <tbody>
+                  <tr>
+                    <td className="w-1/2 border p-4 text-center">
+                      <p className="text-sm text-gray-500 mb-2">Dibuat di Tempat,</p>
+                      <div className="h-20"></div>
+                      <div className="border-t w-full mx-auto mb-2"></div>
+                      <p className="font-medium">{c.pengembang_rps || '.........................'}</p>
+                      <p className="text-xs text-gray-500">NIDN. {c.nidn_pengembang || '...........'}</p>
+                      <p className="text-xs text-gray-500">Pengembang RPS</p>
+                    </td>
+                    <td className="w-1/2 border p-4 text-center">
+                      <p className="text-sm text-gray-500 mb-2">Dibuat di Tempat,</p>
+                      <div className="h-20"></div>
+                      <div className="border-t w-full mx-auto mb-2"></div>
+                      <p className="font-medium">{c.dosen_pengampu || c.pengembang_rps || '.........................'}</p>
+                      <p className="text-xs text-gray-500">NIDN. {c.nidn_pengembang || '...........'}</p>
+                      <p className="text-xs text-gray-500">Dosen Pengampu</p>
+                    </td>
+                  </tr>
+                  <tr>
+                    <td className="w-1/2 border p-4 text-center">
+                      <p className="text-sm text-gray-500 mb-2">Mengetahui,</p>
+                      <div className="h-20"></div>
+                      <div className="border-t w-full mx-auto mb-2"></div>
+                      <p className="font-medium">{c.kaprodi || '.........................'}</p>
+                      <p className="text-xs text-gray-500">NIDN. {c.nidn_kaprodi || '...........'}</p>
+                      <p className="text-xs text-gray-500">Kaprodi {c.prodi || 'S1 Farmasi'}</p>
+                    </td>
+                    <td className="w-1/2 border p-4 text-center">
+                      <p className="text-sm text-gray-500 mb-2">Mengetahui,</p>
+                      <div className="h-20"></div>
+                      <div className="border-t w-full mx-auto mb-2"></div>
+                      <p className="font-medium">{c.wakil_ketua_i || '.........................'}</p>
+                      <p className="text-xs text-gray-500">NIDN. {c.nidn_wakil_ketua_i || '...........'}</p>
+                      <p className="text-xs text-gray-500">Wakil Ketua I Bidang Akademik</p>
+                    </td>
+                  </tr>
+                  <tr>
+                    <td className="w-1/2 border p-4 text-center" colSpan={2}>
+                      <p className="text-sm text-gray-500 mb-2">Mengetahui,</p>
+                      <div className="h-20"></div>
+                      <div className="border-t w-1/2 mx-auto mb-2"></div>
+                      <p className="font-medium">{c.ketua_stikes || '.........................'}</p>
+                      <p className="text-xs text-gray-500">NIDN. {c.nidn_ketua_stikes || '...........'}</p>
+                      <p className="text-xs text-gray-500">Ketua STIKes Ibnu Sina Ajibarang</p>
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
+            </section>
+          )}
         </div>
       </div>
 
@@ -645,7 +918,7 @@ export function Editor({ project, onUpdate, onSave, onSaveAs, onExport, onOpenAI
         {sections.map((section) => (
           <button
             key={section.id}
-            onClick={() => setActiveSection(section.id)}
+            onClick={() => handleSectionSwitch(section.id)}
             className={activeSection === section.id ? 'active' : ''}
           >
             {section.label}

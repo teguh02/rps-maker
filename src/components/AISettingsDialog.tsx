@@ -7,6 +7,7 @@ interface AISettingsDialogProps {
 }
 
 export function AISettingsDialog({ open, onClose }: AISettingsDialogProps) {
+  const [provider, setProvider] = useState<'free' | 'custom'>('free')
   const [host, setHost] = useState('')
   const [apiKey, setApiKey] = useState('')
   const [model, setModel] = useState('')
@@ -16,6 +17,7 @@ export function AISettingsDialog({ open, onClose }: AISettingsDialogProps) {
   useEffect(() => {
     if (open) {
       const s = getAISettings()
+      setProvider(s.provider || 'free')
       setHost(s.apiHost)
       setApiKey(s.apiKey)
       setModel(s.model)
@@ -25,14 +27,14 @@ export function AISettingsDialog({ open, onClose }: AISettingsDialogProps) {
   }, [open])
 
   const handleSave = () => {
-    setAISettings({ apiHost: host, apiKey, model })
+    setAISettings({ provider, apiHost: host, apiKey, model })
     onClose()
   }
 
   const handleTest = async () => {
     setTestStatus('loading')
     setTestMessage('Menghubungi server...')
-    setAISettings({ apiHost: host, apiKey, model })
+    setAISettings({ provider, apiHost: host, apiKey, model })
     const result = await testConnection()
     setTestStatus(result.ok ? 'ok' : 'error')
     setTestMessage(result.message)
@@ -52,43 +54,84 @@ export function AISettingsDialog({ open, onClose }: AISettingsDialogProps) {
 
         <div className="dialog-body space-y-4">
           <div className="form-group">
-            <label className="form-label">API Host URL</label>
-            <input
-              type="text"
-              value={host}
-              onChange={(e) => setHost(e.target.value)}
-              className="form-input"
-              placeholder="https://api.openai.com"
-            />
-            <p className="form-hint">
-              OpenAI, Anthropic (via proxy), Ollama (http://localhost:11434), dll
-            </p>
+            <label className="form-label">Provider</label>
+            <div className="flex gap-4">
+              <label className="flex items-center gap-2 cursor-pointer">
+                <input
+                  type="radio"
+                  name="provider"
+                  value="free"
+                  checked={provider === 'free'}
+                  onChange={() => setProvider('free')}
+                  className="w-4 h-4"
+                />
+                <span className="text-sm font-medium">Gratis</span>
+              </label>
+              <label className="flex items-center gap-2 cursor-pointer">
+                <input
+                  type="radio"
+                  name="provider"
+                  value="custom"
+                  checked={provider === 'custom'}
+                  onChange={() => setProvider('custom')}
+                  className="w-4 h-4"
+                />
+                <span className="text-sm font-medium">Custom</span>
+              </label>
+            </div>
           </div>
 
-          <div className="form-group">
-            <label className="form-label">API Key</label>
-            <input
-              type="password"
-              value={apiKey}
-              onChange={(e) => setApiKey(e.target.value)}
-              className="form-input"
-              placeholder="sk-..."
-            />
-          </div>
+          {provider === 'free' && (
+            <div className="ai-provider-info">
+              <p className="text-sm font-medium">✅ Provider Gratis Aktif</p>
+              <p className="text-xs mt-1">
+                Bisa digunakan kapan saja dengan batasan penggunaan harian.
+              </p>
+            </div>
+          )}
 
-          <div className="form-group">
-            <label className="form-label">Model</label>
-            <input
-              type="text"
-              value={model}
-              onChange={(e) => setModel(e.target.value)}
-              className="form-input"
-              placeholder="gpt-4o"
-            />
-            <p className="form-hint">
-              GPT-4o, Claude-3.5-sonnet, gemini-pro, llama3, dll
-            </p>
-          </div>
+          {provider === 'custom' && (
+            <>
+              <div className="form-group">
+                <label className="form-label">API Host URL</label>
+                <input
+                  type="text"
+                  value={host}
+                  onChange={(e) => setHost(e.target.value)}
+                  className="form-input"
+                  placeholder="https://api.openai.com"
+                />
+                <p className="form-hint">
+                  OpenAI, Anthropic (via proxy), Ollama (http://localhost:11434), dll
+                </p>
+              </div>
+
+              <div className="form-group">
+                <label className="form-label">API Key</label>
+                <input
+                  type="password"
+                  value={apiKey}
+                  onChange={(e) => setApiKey(e.target.value)}
+                  className="form-input"
+                  placeholder="sk-..."
+                />
+              </div>
+
+              <div className="form-group">
+                <label className="form-label">Model</label>
+                <input
+                  type="text"
+                  value={model}
+                  onChange={(e) => setModel(e.target.value)}
+                  className="form-input"
+                  placeholder="gpt-4o"
+                />
+                <p className="form-hint">
+                  GPT-4o, Claude-3.5-sonnet, gemini-pro, llama3, dll
+                </p>
+              </div>
+            </>
+          )}
 
           {testStatus !== 'idle' && (
             <div className={`status-msg ${testStatus === 'ok' ? 'status-msg-ok' : testStatus === 'loading' ? 'status-msg-info' : 'status-msg-err'}`}>

@@ -325,7 +325,8 @@ export function getDefaultTemplate(): Record<string, string> {
     mata_kuliah: '',
     kode_mk: '',
     rumpun_mk: '',
-    sks: '',
+    sks_t: '',
+    sks_p: '',
     semester: '',
     dosen: '',
     semester_akademik: '',
@@ -334,16 +335,37 @@ export function getDefaultTemplate(): Record<string, string> {
     pengembang_rps: '',
     koordinator_rmk: '',
     kaprodi: '',
+    ketua_stikes: '',
     // CPL
-    cpl: '',
+    cpl: JSON.stringify([
+      { label: 'CPL-1', deskripsi: '' },
+      { label: 'CPL-2', deskripsi: '' },
+      { label: 'CPL-3', deskripsi: '' },
+      { label: 'CPL-4', deskripsi: '' },
+    ]),
     // CPMK
-    cpmk: '',
+    cpmk: JSON.stringify([
+      { label: 'CPMK-1', deskripsi: '' },
+      { label: 'CPMK-2', deskripsi: '' },
+      { label: 'CPMK-3', deskripsi: '' },
+      { label: 'CPMK-4', deskripsi: '' },
+    ]),
     // Sub-CPMK
-    sub_cpmk: '',
+    sub_cpmk: JSON.stringify([
+      { label: 'Sub-CPMK1', cpmk: 'CPMK-1', deskripsi: '' },
+      { label: 'Sub-CPMK2', cpmk: 'CPMK-2', deskripsi: '' },
+      { label: 'Sub-CPMK3', cpmk: 'CPMK-3', deskripsi: '' },
+      { label: 'Sub-CPMK4', cpmk: 'CPMK-4', deskripsi: '' },
+    ]),
     // Deskripsi
     deskripsi_mk: '',
     // Bahan Kajian
-    bahan_kajian: '',
+    bahan_kajian: JSON.stringify([
+      { label: '1', judul: '', deskripsi: '' },
+      { label: '2', judul: '', deskripsi: '' },
+      { label: '3', judul: '', deskripsi: '' },
+      { label: '4', judul: '', deskripsi: '' },
+    ]),
     // Penilaian (flexible JSON)
     penilaian: JSON.stringify([
       { item: 'Kehadiran', bobot: 10 },
@@ -358,6 +380,12 @@ export function getDefaultTemplate(): Record<string, string> {
     // Dosen & Prasyarat
     dosen_pengampu: '',
     matakuliah_syarat: '',
+    // Identitas Dosen
+    nidn_pengembang: '',
+    nidn_kaprodi: '',
+    nidn_ketua_stikes: '',
+    wakil_ketua_i: '',
+    nidn_wakil_ketua_i: '',
     // Tabel Pertemuan (flexible JSON)
     pertemuan: '[]',
   }
@@ -370,19 +398,39 @@ export function getPreloadedTemplate(prodiKode: string, mkKode: string): Record<
   const mk = prodi.mataKuliah.find(m => m.kode === mkKode)
   if (!mk) return getDefaultTemplate()
 
-  const cplHtml = mk.cpl.map(c => `<p>${c}</p>`).join('')
-  const cpmkHtml = mk.cpmk.map(c => `<p>${c}</p>`).join('')
-  const subCpmkHtml = mk.subCpmk.map(s => `<p>${s}</p>`).join('')
-  const bahanKajianHtml = mk.bahanKajian.map(b => `<p>• ${b}</p>`).join('')
-  const pustakaUtamaHtml = mk.pustakaUtama.map(r => `<p>${r}</p>`).join('')
-  const pustakaPendukungHtml = mk.pustakaPendukung.map(r => `<p>${r}</p>`).join('')
+  const cplItems = mk.cpl.map((c, idx) => {
+    const match = c.match(/^CPL\s*\d+:\s*(.+)/)
+    return { label: `CPL-${idx + 1}`, deskripsi: match ? match[1] : c }
+  })
+  const cpmkItems = mk.cpmk.map((c, idx) => {
+    const match = c.match(/^CPMK-\d+:\s*(.+)/)
+    return { label: `CPMK-${idx + 1}`, deskripsi: match ? match[1] : c }
+  })
+  const subCpmkItems = mk.subCpmk.map((s, idx) => {
+    const match = s.match(/^(Sub-CPMK\d+):\s*(.+)/)
+    const label = match ? match[1] : `Sub-CPMK${idx + 1}`
+    const deskripsi = match ? match[2] : s
+    // Determine CPMK parent based on index
+    let cpmkParent = 'CPMK-1'
+    if (mk.cpmk.length > 0) {
+      const cpmkIdx = Math.min(Math.floor(idx / Math.ceil(mk.subCpmk.length / mk.cpmk.length)), mk.cpmk.length - 1)
+      cpmkParent = `CPMK-${cpmkIdx + 1}`
+    }
+    return { label, cpmk: cpmkParent, deskripsi }
+  })
+  const bahanKajianItems = mk.bahanKajian.map((b, idx) => ({
+    label: String(idx + 1),
+    judul: b,
+    deskripsi: '',
+  }))
 
   return {
     prodi: prodi.nama,
     mata_kuliah: mk.nama,
     kode_mk: mk.kode,
     rumpun_mk: mk.rumpunMK,
-    sks: mk.sks.toString(),
+    sks_t: mk.sks.toString(),
+    sks_p: '0',
     semester: mk.semester.toString(),
     dosen: '',
     semester_akademik: '',
@@ -390,11 +438,12 @@ export function getPreloadedTemplate(prodiKode: string, mkKode: string): Record<
     pengembang_rps: '',
     koordinator_rmk: '',
     kaprodi: '',
-    cpl: cplHtml,
-    cpmk: cpmkHtml,
-    sub_cpmk: subCpmkHtml,
+    ketua_stikes: '',
+    cpl: JSON.stringify(cplItems),
+    cpmk: JSON.stringify(cpmkItems),
+    sub_cpmk: JSON.stringify(subCpmkItems),
     deskripsi_mk: mk.deskripsiMK,
-    bahan_kajian: bahanKajianHtml,
+    bahan_kajian: JSON.stringify(bahanKajianItems),
     penilaian: JSON.stringify([
       { item: 'Kehadiran', bobot: 10 },
       { item: 'Partisipasi', bobot: 5 },
@@ -402,10 +451,15 @@ export function getPreloadedTemplate(prodiKode: string, mkKode: string): Record<
       { item: 'UTS', bobot: 30 },
       { item: 'UAS', bobot: 40 },
     ]),
-    pustaka_utama: pustakaUtamaHtml,
-    pustaka_pendukung: pustakaPendukungHtml,
+    pustaka_utama: mk.pustakaUtama.join('\n'),
+    pustaka_pendukung: mk.pustakaPendukung.join('\n'),
     dosen_pengampu: '',
     matakuliah_syarat: mk.matakuliahSyarat,
+    nidn_pengembang: '',
+    nidn_kaprodi: '',
+    nidn_ketua_stikes: '',
+    wakil_ketua_i: '',
+    nidn_wakil_ketua_i: '',
     pertemuan: '[]',
   }
 }

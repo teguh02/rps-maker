@@ -13,6 +13,7 @@
   "build": {
     "appId": "com.unisina.rps-maker",
     "productName": "RPS Maker UNISINA",
+    "icon": "build/icon.ico",
     "directories": {
       "output": "release"
     },

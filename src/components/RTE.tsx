@@ -1,5 +1,6 @@
 import { useEditor, EditorContent } from '@tiptap/react'
 import StarterKit from '@tiptap/starter-kit'
+import { useEffect } from 'react'
 
 export interface RTEProps {
   content: string
@@ -23,6 +24,16 @@ export function RTE({ content, onUpdate, placeholder }: RTEProps) {
       },
     },
   })
+
+  // Sync editor content when prop changes (e.g. after AI generate)
+  useEffect(() => {
+    if (editor && content !== undefined) {
+      const current = editor.getHTML()
+      if (current !== content) {
+        editor.commands.setContent(content, false)
+      }
+    }
+  }, [content, editor])
 
   if (!editor) {
     return null

@@ -23,6 +23,13 @@ body {
   margin: 32px auto;
 }
 
+/* Landscape mode for all sections except Cover */
+.paper-canvas.landscape {
+  width: 1056px;
+  min-height: 816px;
+  padding: 54px 72px;
+}
+
 /* ── RPS Cover Page (matching real format) ── */
 .rps-cover {
   text-align: center;
@@ -262,41 +269,172 @@ body {
   color: #6b7280;
 }
 
-/* ── Section tab bar (Excel-style) ── */
+/* ── Section tab bar (Excel-style, matching ribbon theme) ── */
 .section-tabs {
   display: flex;
   gap: 0;
-  padding: 0;
-  background: #e0e0e0;
-  border-top: 1px solid #999;
+  padding: 0 4px;
+  background: #2563eb;
+  border-top: 1px solid #1d4ed8;
   overflow-x: auto;
 }
 
 .section-tabs button {
-  padding: 0.25rem 0.625rem;
+  padding: 6px 14px;
+  font-size: 0.8125rem;
+  color: rgba(255,255,255,0.85);
+  background: transparent;
+  border: none;
   border-radius: 0;
-  font-size: 0.75rem;
   white-space: nowrap;
+  cursor: pointer;
   transition: background 0.1s, color 0.1s;
-  border: 1px solid #999;
-  border-bottom: none;
   margin-bottom: -1px;
 }
 
 .section-tabs button.active {
   background: #fff;
-  color: #000;
+  color: #1e40af;
   font-weight: 600;
-  border-bottom: 1px solid #fff;
 }
 
 .section-tabs button:not(.active) {
-  background: #d4d4d4;
-  color: #333;
+  background: transparent;
+  color: rgba(255,255,255,0.85);
 }
 
 .section-tabs button:not(.active):hover {
-  background: #c0c0c0;
+  background: rgba(255,255,255,0.15);
+  color: #fff;
+}
+
+/* ── Ribbon (Office 365 style) ── */
+.ribbon {
+  background: #fff;
+  border-bottom: 1px solid #d1d5db;
+  user-select: none;
+}
+
+.ribbon-tabs {
+  display: flex;
+  gap: 0;
+  padding: 0 4px;
+  background: #2563eb;
+}
+
+.ribbon-tab-item {
+  padding: 6px 14px;
+  font-size: 0.8125rem;
+  color: rgba(255,255,255,0.85);
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  transition: background 0.1s, color 0.1s;
+}
+
+.ribbon-tab-item:hover {
+  background: rgba(255,255,255,0.15);
+  color: #fff;
+}
+
+.ribbon-tab-item.active {
+  background: #fff;
+  color: #1e40af;
+  font-weight: 600;
+}
+
+.ribbon-collapse-btn {
+  margin-left: auto;
+  padding: 4px 8px;
+  background: transparent;
+  border: none;
+  color: rgba(255,255,255,0.7);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: color 0.1s;
+}
+
+.ribbon-collapse-btn:hover {
+  color: #fff;
+}
+
+.ribbon-content {
+  display: flex;
+  gap: 0;
+  padding: 4px 8px;
+  min-height: 56px;
+  align-items: stretch;
+}
+
+.ribbon-group {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 0 8px;
+  position: relative;
+}
+
+.ribbon-group + .ribbon-group {
+  border-left: 1px solid #e5e7eb;
+}
+
+.ribbon-group-buttons {
+  display: flex;
+  gap: 2px;
+  flex: 1;
+  align-items: center;
+}
+
+.ribbon-group-label {
+  font-size: 0.625rem;
+  color: #6b7280;
+  text-align: center;
+  padding-top: 1px;
+  white-space: nowrap;
+}
+
+.ribbon-btn {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1px;
+  padding: 4px 8px;
+  border: 1px solid transparent;
+  border-radius: 3px;
+  background: transparent;
+  cursor: pointer;
+  transition: background 0.1s, border-color 0.1s;
+  min-width: 48px;
+}
+
+.ribbon-btn:hover {
+  background: #e0e7ff;
+  border-color: #bfdbfe;
+}
+
+.ribbon-btn:active {
+  background: #c7d2fe;
+}
+
+.ribbon-btn-disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+  pointer-events: none;
+}
+
+.ribbon-btn-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #374151;
+}
+
+.ribbon-btn-label {
+  font-size: 0.625rem;
+  color: #374151;
+  white-space: nowrap;
 }
 
 /* ── AI generate button ── */
@@ -316,37 +454,54 @@ body {
   background: #e9d5ff;
 }
 
+/* ── Section Guide Alert ── */
+.section-guide-alert {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  margin: 16px auto 0;
+  padding: 10px 16px;
+  border: 1px solid #bfdbfe;
+  border-radius: 6px;
+  background: #eff6ff;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.08);
+}
+
+.section-guide-alert.w-cover {
+  width: 816px;
+}
+
+.section-guide-alert.w-landscape {
+  width: 1056px;
+}
+
+.section-guide-text {
+  flex: 1;
+  font-size: 13px;
+  color: #1d4ed8;
+  line-height: 1.6;
+}
+
+.section-guide-close {
+  background: none;
+  border: none;
+  font-size: 18px;
+  line-height: 1;
+  color: #60a5fa;
+  cursor: pointer;
+  padding: 0 2px;
+}
+
+.section-guide-close:hover {
+  color: #2563eb;
+}
+
 .btn-ai:disabled {
   opacity: 0.5;
   cursor: not-allowed;
 }
 
 /* ── Guide tooltip ── */
-.section-guide {
-  margin-top: 0.75rem;
-  padding: 0.5rem 0.75rem;
-  border-radius: 0.25rem;
-  font-size: 0.75rem;
-  background: #f0f9ff;
-  color: #1d4ed8;
-  line-height: 1.5;
-}
-
-/* ── Toolbar buttons ── */
-.toolbar-btn {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.25rem;
-  padding: 0.375rem 0.75rem;
-  border-radius: 0.25rem;
-  font-size: 0.8125rem;
-  background: #f3f4f6;
-  transition: background 0.15s;
-}
-
-.toolbar-btn:hover {
-  background: #e5e7eb;
-}
 
 /* ── Dialog backdrop ── */
 .dialog-backdrop {
@@ -624,6 +779,14 @@ body {
 
 .status-msg-info {
   background: #eff6ff;
+  color: #1e40af;
+}
+
+.ai-provider-info {
+  background: #eff6ff;
+  border: 1px solid #bfdbfe;
+  border-radius: 0.5rem;
+  padding: 0.75rem;
   color: #1e40af;
 }
 

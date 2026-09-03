@@ -1,9 +1,10 @@
-import { useState, useRef, useEffect } from 'react'
+import { useState } from 'react'
 import {
   HomeIcon, FileIcon, FolderOpenIcon, SaveIcon, SaveAsIcon,
   ExportWordIcon, ExportPdfIcon, SparklesIcon, SettingsIcon,
-  PasteIcon, KeyboardIcon, InfoIcon, TableIcon, ChevronDownIcon,
+  CopyIcon, CutIcon, PasteIcon, KeyboardIcon, InfoIcon,
 } from './icons'
+import { logger } from '../utils/logger'
 
 interface RibbonProps {
   onSave: () => void
@@ -11,150 +12,120 @@ interface RibbonProps {
   onExport?: (format: 'pdf' | 'docx') => void
   onOpenAISettings?: () => void
   onGoHome?: () => void
+  activeSection?: string
+  onGenerateAI?: () => void
+  aiLoading?: boolean
 }
 
-type TabId = 'file' | 'home' | 'insert' | 'ai' | 'help'
+type TabId = 'file' | 'home' | 'ai' | 'help'
 
-interface Tab {
-  id: TabId
-  label: string
-}
-
-const tabs: Tab[] = [
+const tabs: { id: TabId; label: string }[] = [
   { id: 'file', label: 'File' },
   { id: 'home', label: 'Home' },
-  { id: 'insert', label: 'Insert' },
   { id: 'ai', label: 'AI' },
   { id: 'help', label: 'Help' },
 ]
 
-export function Ribbon({ onSave, onSaveAs, onExport, onOpenAISettings, onGoHome }: RibbonProps) {
+const AI_SUPPORTED_SECTIONS = ['cpl', 'cpmk', 'sub_cpmk', 'deskripsi_mk', 'bahan_kajian', 'penilaian', 'pustaka']
+
+export function Ribbon({ onSave, onSaveAs, onExport, onOpenAISettings, onGoHome, activeSection, onGenerateAI, aiLoading }: RibbonProps) {
   const [activeTab, setActiveTab] = useState<TabId>('home')
-  const [showExportDrop, setShowExportDrop] = useState(false)
-  const [showFilePanel, setShowFilePanel] = useState(false)
-  const exportRef = useRef<HTMLDivElement>(null)
+  const [showContent, setShowContent] = useState(true)
 
-  useEffect(() => {
-    const handleClick = (e: MouseEvent) => {
-      if (exportRef.current && !exportRef.current.contains(e.target as Node)) {
-        setShowExportDrop(false)
-      }
+  const handleTabClick = (tabId: TabId) => {
+    if (activeTab === tabId) {
+      setShowContent(prev => !prev)
+    } else {
+      setActiveTab(tabId)
+      setShowContent(true)
     }
-    document.addEventListener('mousedown', handleClick)
-    return () => document.removeEventListener('mousedown', handleClick)
-  }, [])
-
-  const handleTabClick = (id: TabId) => {
-    if (id === 'file') {
-      setShowFilePanel(!showFilePanel)
-      return
-    }
-    setShowFilePanel(false)
-    setActiveTab(id)
   }
 
   return (
     <div className="ribbon">
-      {/* Tab bar */}
       <div className="ribbon-tabs">
-        <button
-          className={`ribbon-tab-item ${showFilePanel ? 'active' : ''}`}
-          onClick={() => handleTabClick('file')}
-        >
-          File
-        </button>
-        {tabs.filter(t => t.id !== 'file').map(tab => (
+        {tabs.map(tab => (
           <button
             key={tab.id}
-            className={`ribbon-tab-item ${activeTab === tab.id && !showFilePanel ? 'active' : ''}`}
+            className={`ribbon-tab-item ${activeTab === tab.id ? 'active' : ''}`}
             onClick={() => handleTabClick(tab.id)}
           >
             {tab.label}
           </button>
         ))}
+        <button
+          className="ribbon-collapse-btn"
+          onClick={() => setShowContent(prev => !prev)}
+          title={showContent ? 'Minimize Ribbon' : 'Expand Ribbon'}
+        >
+          <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
+            {showContent
+              ? <path d="M2 8L6 4L10 8" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+              : <path d="M2 4L6 8L10 4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+            }
+          </svg>
+        </button>
       </div>
 
-      {/* File panel (Backstage) */}
-      {showFilePanel && (
-        <div className="ribbon-file-panel">
-          <div className="ribbon-file-sidebar">
-            <button className="ribbon-file-sidebar-item" onClick={() => { onGoHome?.(); setShowFilePanel(false) }}>
-              <HomeIcon size={18} /> Home
-            </button>
-          </div>
-          <div className="ribbon-file-content">
-            <button className="ribbon-file-action" onClick={() => { onGoHome?.(); setShowFilePanel(false) }}>
-              <HomeIcon size={24} />
-              <div>
-                <div className="ribbon-file-action-title">Home</div>
-                <div className="ribbon-file-action-desc">Kembali ke layar utama</div>
-              </div>
-            </button>
-          </div>
-        </div>
-      )}
-
-      {/* Ribbon content */}
-      {!showFilePanel && (
+      {showContent && (
         <div className="ribbon-content">
-          {activeTab === 'home' && (
-            <>
-              <RibbonGroup label="Project">
-                <RibbonButton icon={<FileIcon size={20} />} label="New" onClick={() => onGoHome?.()} />
-                <RibbonButton icon={<FolderOpenIcon size={20} />} label="Open" onClick={() => onGoHome?.()} />
-                <RibbonButton icon={<SaveIcon size={20} />} label="Save" onClick={onSave} />
-                <RibbonButton icon={<SaveAsIcon size={20} />} label="Save As" onClick={onSaveAs} />
-              </RibbonGroup>
-
-              <RibbonGroup label="Clipboard">
-                <RibbonButton icon={<PasteIcon size={20} />} label="Paste" onClick={() => document.execCommand('paste')} />
-              </RibbonGroup>
-
-              <RibbonGroup label="Export">
-                <RibbonButton icon={<ExportWordIcon size={20} />} label="Word" onClick={() => onExport?.('docx')} />
-                <RibbonButton icon={<ExportPdfIcon size={20} />} label="PDF" onClick={() => onExport?.('pdf')} />
-              </RibbonGroup>
-
-              <RibbonGroup label="AI">
-                <RibbonButton icon={<SparklesIcon size={20} />} label="Generate" onClick={onOpenAISettings} />
-                <RibbonButton icon={<SettingsIcon size={20} />} label="AI Settings" onClick={onOpenAISettings} />
-              </RibbonGroup>
-            </>
-          )}
-
-          {activeTab === 'insert' && (
-            <RibbonGroup label="Table">
-              <RibbonButton icon={<TableIcon size={20} />} label="Add Row" onClick={() => {}} />
-              <RibbonButton icon={<TableIcon size={20} />} label="Add Column" onClick={() => {}} />
+        {activeTab === 'file' && (
+          <>
+            <RibbonGroup label="Project">
+              <RibbonButton icon={<HomeIcon size={20} />} label="Home" onClick={() => onGoHome?.()} />
+              <RibbonButton icon={<FileIcon size={20} />} label="New" onClick={() => onGoHome?.()} />
+              <RibbonButton icon={<FolderOpenIcon size={20} />} label="Open" onClick={() => onGoHome?.()} />
             </RibbonGroup>
-          )}
+            <RibbonGroup label="Save">
+              <RibbonButton icon={<SaveIcon size={20} />} label="Save" onClick={onSave} />
+              <RibbonButton icon={<SaveAsIcon size={20} />} label="Save As" onClick={onSaveAs} />
+            </RibbonGroup>
+            <RibbonGroup label="Export">
+              <RibbonButton icon={<ExportWordIcon size={20} />} label="Word" onClick={() => onExport?.('docx')} />
+              <RibbonButton icon={<ExportPdfIcon size={20} />} label="PDF" onClick={() => onExport?.('pdf')} />
+            </RibbonGroup>
+          </>
+        )}
 
-          {activeTab === 'ai' && (
-            <>
-              <RibbonGroup label="Generate">
-                <RibbonButton icon={<SparklesIcon size={20} />} label="Generate Section" onClick={onOpenAISettings} />
-              </RibbonGroup>
-              <RibbonGroup label="Settings">
-                <RibbonButton icon={<SettingsIcon size={20} />} label="AI Settings" onClick={onOpenAISettings} />
-              </RibbonGroup>
-            </>
-          )}
+        {activeTab === 'home' && (
+          <RibbonGroup label="Clipboard">
+            <RibbonButton icon={<CutIcon size={20} />} label="Cut" onClick={() => document.execCommand('cut')} />
+            <RibbonButton icon={<CopyIcon size={20} />} label="Copy" onClick={() => document.execCommand('copy')} />
+            <RibbonButton icon={<PasteIcon size={20} />} label="Paste" onClick={() => document.execCommand('paste')} />
+          </RibbonGroup>
+        )}
 
-          {activeTab === 'help' && (
-            <>
-              <RibbonGroup label="Support">
-                <RibbonButton icon={<KeyboardIcon size={20} />} label="Shortcuts" onClick={() => {}} />
-                <RibbonButton icon={<InfoIcon size={20} />} label="About" onClick={() => {}} />
-              </RibbonGroup>
-            </>
-          )}
+        {activeTab === 'ai' && (
+          <>
+            <RibbonGroup label="Generate">
+              <RibbonButton
+                icon={<SparklesIcon size={20} />}
+                label="Generate Section"
+                onClick={() => {
+                  logger.info('Ribbon', 'ai.generate_click', { activeSection, aiLoading })
+                  onGenerateAI?.()
+                }}
+                disabled={!activeSection || !AI_SUPPORTED_SECTIONS.includes(activeSection) || aiLoading}
+                loading={aiLoading}
+              />
+            </RibbonGroup>
+            <RibbonGroup label="Settings">
+              <RibbonButton icon={<SettingsIcon size={20} />} label="AI Settings" onClick={() => onOpenAISettings?.()} />
+            </RibbonGroup>
+          </>
+        )}
+
+        {activeTab === 'help' && (
+          <RibbonGroup label="Support">
+            <RibbonButton icon={<KeyboardIcon size={20} />} label="Shortcuts" onClick={() => {}} />
+            <RibbonButton icon={<InfoIcon size={20} />} label="About" onClick={() => {}} />
+          </RibbonGroup>
+        )}
         </div>
       )}
     </div>
   )
 }
-
-/* ── Sub-components ── */
 
 function RibbonGroup({ label, children }: { label: string; children: React.ReactNode }) {
   return (
@@ -165,11 +136,27 @@ function RibbonGroup({ label, children }: { label: string; children: React.React
   )
 }
 
-function RibbonButton({ icon, label, onClick }: { icon: React.ReactNode; label: string; onClick: () => void }) {
+function RibbonButton({ icon, label, onClick, disabled, loading }: { icon: React.ReactNode; label: string; onClick: () => void; disabled?: boolean; loading?: boolean }) {
   return (
-    <button className="ribbon-btn" onClick={onClick}>
-      <span className="ribbon-btn-icon">{icon}</span>
-      <span className="ribbon-btn-label">{label}</span>
+    <button
+      className={`ribbon-btn ${disabled ? 'ribbon-btn-disabled' : ''}`}
+      onClick={() => {
+        if (!disabled) {
+          onClick()
+        }
+      }}
+      disabled={disabled}
+    >
+      <span className="ribbon-btn-icon">{loading ? <SpinnerIcon /> : icon}</span>
+      <span className="ribbon-btn-label">{loading ? 'Generating...' : label}</span>
     </button>
+  )
+}
+
+function SpinnerIcon() {
+  return (
+    <svg width="20" height="20" viewBox="0 0 20 20" fill="none" className="animate-spin">
+      <circle cx="10" cy="10" r="8" stroke="currentColor" strokeWidth="2" strokeDasharray="40" strokeDashoffset="10" />
+    </svg>
   )
 }

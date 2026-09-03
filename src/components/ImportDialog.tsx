@@ -62,18 +62,18 @@ export function ImportDialog({ open, onClose, onImport }: ImportDialogProps) {
   if (!open) return null
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
-      <div className="bg-white rounded-lg shadow-xl w-full max-w-lg mx-4">
-        <div className="px-6 py-4 border-b">
+    <div className="dialog-backdrop">
+      <div className="dialog-panel max-w-lg">
+        <div className="dialog-header">
           <h2 className="text-lg font-bold">📚 Import Kurikulum</h2>
           <p className="text-sm text-gray-500 mt-1">
             Import data kurikulum dari file CSV/Excel
           </p>
         </div>
 
-        <div className="px-6 py-4">
+        <div className="dialog-body">
           {step === 'upload' && (
-            <div className="border-2 border-dashed border-gray-300 rounded-lg p-8 text-center">
+            <div className="upload-zone">
               <div className="text-4xl mb-4">📄</div>
               <p className="text-gray-600 mb-4">
                 Pilih file CSV atau Excel yang berisi data kurikulum
@@ -84,7 +84,7 @@ export function ImportDialog({ open, onClose, onImport }: ImportDialogProps) {
                 onChange={handleFileUpload}
                 className="block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-md file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100"
               />
-              <p className="text-xs text-gray-400 mt-3">
+              <p className="form-hint mt-3">
                 Format kolom: Prodi, Mata Kuliah, Kode MK, SKS, Semester, Dosen, CPL, CPMK
               </p>
             </div>
@@ -96,19 +96,19 @@ export function ImportDialog({ open, onClose, onImport }: ImportDialogProps) {
                 Preview data yang akan diimport ({rawData.length} baris):
               </p>
               <div className="max-h-64 overflow-auto border rounded">
-                <table className="w-full text-sm">
+                <table className="preview-table">
                   <thead>
-                    <tr className="bg-gray-50">
+                    <tr>
                       {headers.map((h, i) => (
-                        <th key={i} className="px-3 py-2 text-left border-b">{h}</th>
+                        <th key={i}>{h}</th>
                       ))}
                     </tr>
                   </thead>
                   <tbody>
                     {rawData.slice(0, 5).map((row, i) => (
-                      <tr key={i} className="border-b">
+                      <tr key={i}>
                         {row.map((cell, j) => (
-                          <td key={j} className="px-3 py-2">{cell}</td>
+                          <td key={j}>{cell}</td>
                         ))}
                       </tr>
                     ))}
@@ -116,7 +116,7 @@ export function ImportDialog({ open, onClose, onImport }: ImportDialogProps) {
                 </table>
               </div>
               {rawData.length > 5 && (
-                <p className="text-xs text-gray-400 mt-2">...dan {rawData.length - 5} baris lainnya</p>
+                <p className="form-hint mt-2">...dan {rawData.length - 5} baris lainnya</p>
               )}
             </div>
           )}
@@ -129,18 +129,12 @@ export function ImportDialog({ open, onClose, onImport }: ImportDialogProps) {
           )}
         </div>
 
-        <div className="px-6 py-4 border-t flex justify-end gap-2">
-          <button
-            onClick={onClose}
-            className="px-4 py-2 text-sm bg-gray-100 hover:bg-gray-200 rounded-md"
-          >
+        <div className="dialog-footer">
+          <button onClick={onClose} className="btn btn-secondary">
             Batal
           </button>
           {step === 'mapping' && (
-            <button
-              onClick={handleImport}
-              className="px-4 py-2 text-sm bg-blue-600 hover:bg-blue-700 text-white rounded-md"
-            >
+            <button onClick={handleImport} className="btn btn-primary">
               Import
             </button>
           )}

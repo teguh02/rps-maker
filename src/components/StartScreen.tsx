@@ -136,6 +136,14 @@ export function StartScreen({ onNew, onOpen, recentFiles, onOpenRecent, onClearR
                 <div className="start-card-btn-title">Buka File</div>
                 <div className="start-card-btn-desc">Buka project .rps yang sudah ada</div>
               </button>
+
+              {recentFiles.length > 0 && (
+                <button onClick={() => setShowRecent(true)} className="start-card-btn">
+                  <div className="start-card-btn-icon">📁</div>
+                  <div className="start-card-btn-title">Project Terakhir</div>
+                  <div className="start-card-btn-desc">{recentFiles.length} project baru dibuka</div>
+                </button>
+              )}
             </div>
           ) : (
             <div>
@@ -187,19 +195,6 @@ export function StartScreen({ onNew, onOpen, recentFiles, onOpenRecent, onClearR
             </div>
           )}
         </div>
-
-        {/* Recent Files Button */}
-        {recentFiles.length > 0 && (
-          <button onClick={() => setShowRecent(true)} className="start-card w-full text-left">
-            <div className="flex items-center justify-between">
-              <div>
-                <h2>📁 Project Terakhir</h2>
-                <p className="text-sm text-gray-500 mt-1">{recentFiles.length} project baru dibuka</p>
-              </div>
-              <span className="text-gray-400 text-lg">→</span>
-            </div>
-          </button>
-        )}
       </div>
 
       <p className="text-xs text-gray-400 mt-8">v1.0.0 — Dibuat untuk Dosen UNISINA</p>

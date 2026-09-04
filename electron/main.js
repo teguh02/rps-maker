@@ -30,15 +30,12 @@ const log = {
 let mainWindow;
 
 function createWindow() {
-  const iconPath = path.join(__dirname, '../build/icon.ico');
-  const iconPng = path.join(__dirname, '../build/icon.png');
+  const iconPath = path.join(__dirname, '../build/icon.png');
   
   // Set app icon for taskbar/window
   try {
     if (fs.existsSync(iconPath)) {
       app.setIcon(iconPath);
-    } else if (fs.existsSync(iconPng)) {
-      app.setIcon(iconPng);
     }
   } catch (e) { /* ignore */ }
 
@@ -49,7 +46,7 @@ function createWindow() {
     minHeight: 600,
     title: 'RPS Maker UNISINA',
     autoHideMenuBar: true,
-    icon: fs.existsSync(iconPath) ? iconPath : iconPng,
+    icon: iconPath,
     webPreferences: {
       nodeIntegration: false,
       contextIsolation: true,

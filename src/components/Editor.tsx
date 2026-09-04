@@ -2,6 +2,7 @@ import { useState } from 'react'
 import type { Project } from '../App'
 import { Ribbon } from './Ribbon'
 import { RTE } from './RTE'
+import { guideSections } from './GuidePage'
 import { isAIConfigured, generateWithAI, getSectionPrompt } from '../services/ai'
 import { logger } from '../utils/logger'
 
@@ -9,10 +10,10 @@ interface EditorProps {
   project: Project
   onUpdate: (content: Record<string, string>) => void
   onSave: () => void
-  onSaveAs: () => void
   onExport?: (format: 'pdf' | 'docx') => void
   onOpenAISettings?: () => void
   onGoHome?: () => void
+  onOpenGuide?: (section: string) => void
 }
 
 interface PenilaianItem {
@@ -51,16 +52,122 @@ interface PertemuanSpecial {
 
 type PertemuanRow = PertemuanItem | PertemuanSpecial
 
-export function Editor({ project, onUpdate, onSave, onSaveAs, onExport, onOpenAISettings, onGoHome }: EditorProps) {
+export function Editor({ project, onUpdate, onSave, onExport, onOpenAISettings, onGoHome, onOpenGuide }: EditorProps) {
   const [activeSection, setActiveSection] = useState('identitas')
   const [aiLoading, setAiLoading] = useState(false)
   const [aiError, setAiError] = useState('')
   const [dismissedGuides, setDismissedGuides] = useState<Set<string>>(new Set())
+  const [zoom, setZoom] = useState(1) // 100%
+  const [undoStack, setUndoStack] = useState<string[]>([])
+  const [redoStack, setRedoStack] = useState<string[]>([])
+  const [currentContent, setCurrentContent] = useState<string>(JSON.stringify(project.content))
+  const [toast, setToast] = useState<{ message: string; type: 'info' | 'warning' | 'error' } | null>(null)
+  const [contextMenu, setContextMenu] = useState<{ x: number; y: number } | null>(null)
+
+  const showToast = (message: string, type: 'info' | 'warning' | 'error' = 'warning') => {
+    setToast({ message, type })
+    setTimeout(() => setToast(null), 3000)
+  }
+
+  const handleContextMenu = (e: React.MouseEvent) => {
+    e.preventDefault()
+    setContextMenu({ x: e.clientX, y: e.clientY })
+  }
+
+  const closeContextMenu = () => setContextMenu(null)
+
+  const handleCut = async () => {
+    const selection = window.getSelection();
+    const selectedText = selection?.toString().trim();
+    if (!selectedText) {
+      showToast('Tidak ada teks yang dipilih. Blok teks terlebih dahulu sebelum Cut.', 'warning')
+      return
+    }
+    try {
+      await navigator.clipboard.writeText(selectedText);
+      selection.removeAllRanges();
+      showToast('Teks berhasil dipotong ke clipboard.', 'info')
+    } catch (err) {
+      showToast('Gagal memotong teks. Periksa izin clipboard browser.', 'error')
+    }
+  };
+
+  const handleCopy = async () => {
+    const selection = window.getSelection();
+    const selectedText = selection?.toString().trim();
+    if (!selectedText) {
+      showToast('Tidak ada teks yang dipilih. Blok teks terlebih dahulu sebelum Copy.', 'warning')
+      return
+    }
+    try {
+      await navigator.clipboard.writeText(selectedText);
+      showToast('Teks berhasil disalin ke clipboard.', 'info')
+    } catch (err) {
+      showToast('Gagal menyalin teks. Periksa izin clipboard browser.', 'error')
+    }
+  };
+
+  const handlePaste = async () => {
+    try {
+      const text = await navigator.clipboard.readText();
+      if (!text || !text.trim()) {
+        showToast('Clipboard kosong. Salin teks terlebih dahulu sebelum Paste.', 'warning')
+        return
+      }
+      const activeElement = document.activeElement;
+      if (activeElement && typeof (activeElement as HTMLElement).insertAdjacentText === 'function') {
+        (activeElement as HTMLElement).insertAdjacentText('end', text);
+        showToast('Teks berhasil ditempel.', 'info')
+      } else {
+        showToast('Tidak ada area input aktif. Klik pada kolom input terlebih dahulu.', 'warning')
+      }
+    } catch (err) {
+      showToast('Gagal menempel teks. Periksa izin clipboard browser.', 'error')
+    }
+  };
+
+  const handleUndo = () => {
+    if (undoStack.length === 0) return;
+    const prev = undoStack[undoStack.length - 1];
+    setUndoStack(undoStack.slice(0, -1));
+    setRedoStack(prevState => [...prevState, currentContent]);
+    setCurrentContent(prev);
+    onUpdate(JSON.parse(prev));
+  };
+
+  const handleRedo = () => {
+    if (redoStack.length === 0) return;
+    const next = redoStack[redoStack.length - 1];
+    setRedoStack(redoStack.slice(0, -1));
+    setUndoStack(prev => [...prev, currentContent]);
+    setCurrentContent(next);
+    onUpdate(JSON.parse(next));
+  };
+
+  const handleZoomIn = () => {
+    setZoom(z => Math.min(z + 0.25, 4));
+  };
+
+  const handleZoomOut = () => {
+    setZoom(z => Math.max(z - 0.25, 0.25));
+  };
+
+  const handleZoomReset = () => {
+    setZoom(1);
+  };
 
   const updateField = (key: string, value: string) => {
     logger.debug('EDITOR', 'editor.field_update', { field: key })
-    onUpdate({ ...project.content, [key]: value })
-  }
+    const newState = { ...project.content, [key]: value }
+    const newContent = JSON.stringify(newState)
+    
+    // Push to undo stack
+    setUndoStack(prev => [...prev, currentContent])
+    setRedoStack([])
+    
+    setCurrentContent(newContent)
+    onUpdate(newState)
+  };
 
   const getStructuredList = (key: string): StructuredItem[] => {
     try {
@@ -265,8 +372,8 @@ export function Editor({ project, onUpdate, onSave, onSaveAs, onExport, onOpenAI
   }
 
   const sections = [
-    { id: 'cover', label: 'Cover' },
     { id: 'identitas', label: 'Identitas' },
+    { id: 'cover', label: 'Cover' },
     { id: 'otorisasi', label: 'Otorisasi' },
     { id: 'cpl', label: 'CPL' },
     { id: 'cpmk', label: 'CPMK' },
@@ -275,7 +382,6 @@ export function Editor({ project, onUpdate, onSave, onSaveAs, onExport, onOpenAI
     { id: 'bahan_kajian', label: 'Bahan Kajian' },
     { id: 'penilaian', label: 'Penilaian' },
     { id: 'pustaka', label: 'Pustaka' },
-    { id: 'dosen_prasyarat', label: 'Dosen & Syarat' },
     { id: 'pertemuan', label: 'Pertemuan' },
     { id: 'ttd', label: 'Pengesahan' },
   ]
@@ -291,7 +397,6 @@ export function Editor({ project, onUpdate, onSave, onSaveAs, onExport, onOpenAI
     bahan_kajian: '💡 Tuliskan bahan kajian utama yang harus dikuasai mahasiswa.',
     penilaian: '💡 Format penilaian fleksibel. Bobot total harus 100%. IKU 7: minimal 50% asesmen partisipatif.',
     pustaka: '💡 Pustaka utama minimal 2 buku. Referensi harus terkini (max 5 tahun terakhir).',
-    dosen_prasyarat: '💡 Tuliskan nama dosen pengampu dan mata kuliah prasyarat (jika ada).',
     pertemuan: '💡 Klik "Generate dari Sub-CPMK" untuk mengisi otomatis, lalu lengkapi kolom lainnya.',
     ttd: '💡 Tanda tangan pengesahan RPS. Isi otomatis dari data Identitas Dosen (Profil).',
   }
@@ -401,28 +506,43 @@ export function Editor({ project, onUpdate, onSave, onSaveAs, onExport, onOpenAI
   }
 
   return (
-    <div className="flex-1 flex flex-col overflow-hidden">
+    <div className="flex-1 flex flex-col overflow-hidden" onContextMenu={handleContextMenu}>
       <Ribbon
         onSave={onSave}
-        onSaveAs={onSaveAs}
         onExport={onExport}
         onOpenAISettings={onOpenAISettings}
         onGoHome={onGoHome}
         activeSection={activeSection}
         onGenerateAI={() => handleAIGenerate(activeSection)}
         aiLoading={aiLoading}
+        onCut={handleCut}
+        onCopy={handleCopy}
+        onPaste={handlePaste}
+        onUndo={handleUndo}
+        onRedo={handleRedo}
+        canUndo={undoStack.length > 0}
+        canRedo={redoStack.length > 0}
+        onZoomIn={handleZoomIn}
+        onZoomOut={handleZoomOut}
+        onZoomReset={handleZoomReset}
       />
 
       <div className="flex-1 overflow-y-auto bg-[#e8e8e8] flex flex-col items-center">
         {/* Section Guide - above canvas */}
         {sectionGuides[activeSection] && !dismissedGuides.has(activeSection) && (
           <div className={`section-guide-alert ${activeSection === 'cover' ? 'w-cover' : 'w-landscape'}`}>
-            <span className="section-guide-text">{sectionGuides[activeSection]}</span>
+            <span className="section-guide-text">{sectionGuides[activeSection]}{' '}
+              {guideSections.includes(activeSection) ? (
+                <a href="#" onClick={(e) => { e.preventDefault(); onOpenGuide?.(activeSection) }} className="section-guide-link">Selengkapnya</a>
+              ) : (
+                <a href="#" onClick={(e) => e.preventDefault()} className="section-guide-link">Selengkapnya</a>
+              )}
+            </span>
             <button onClick={() => dismissGuide(activeSection)} className="section-guide-close">&times;</button>
           </div>
         )}
 
-        <div className={`paper-canvas ${activeSection === 'cover' ? '' : 'landscape'}`}>
+        <div className={`paper-canvas ${activeSection === 'cover' ? '' : 'landscape'}`} style={{ transform: `scale(${zoom})`, transformOrigin: 'top center' }}>
           {/* === COVER PAGE === */}
           {activeSection === 'cover' && (
             <div className="rps-cover">
@@ -460,7 +580,18 @@ export function Editor({ project, onUpdate, onSave, onSaveAs, onExport, onOpenAI
                     ['sks_t', 'Bobot SKS Teori (T)'],
                     ['sks_p', 'Bobot SKS Praktik (P)'],
                     ['semester', 'Semester'],
+                    ['dosen_pengampu', 'Dosen Pengampu'],
+                    ['pengembang_rps', 'Pengembang RPS'],
+                    ['nidn_pengembang', 'NIDN Pengembang'],
+                    ['kaprodi', 'Kaprodi'],
+                    ['nidn_kaprodi', 'NIDN Kaprodi'],
+                    ['ketua_stikes', 'Ketua STIKes'],
+                    ['nidn_ketua_stikes', 'NIDN Ketua STIKes'],
+                    ['wakil_ketua_i', 'Wakil Ketua I'],
+                    ['nidn_wakil_ketua_i', 'NIDN Wakil Ketua I'],
+                    ['semester_akademik', 'Semester Akademik'],
                     ['tgl_penyusunan', 'Tanggal Penyusunan'],
+                    ['matakuliah_syarat', 'Mata Kuliah Prasyarat'],
                   ].map(([key, label]) => (
                     <tr key={key}>
                       <td className="w-56 font-medium text-gray-700">{label}</td>
@@ -483,31 +614,20 @@ export function Editor({ project, onUpdate, onSave, onSaveAs, onExport, onOpenAI
           {activeSection === 'otorisasi' && (
             <section className="editor-content">
               <h2 className="text-lg font-bold mb-4">II. OTORISASI</h2>
+              <p className="text-sm text-gray-500 mb-3">Data otorisasi diambil dari tab Identitas. Koordinator RMK diisi di sini.</p>
               <table className="w-full">
                 <tbody>
-                  {[
-                    ['pengembang_rps', 'Pengembang RPS (Dosen)'],
-                    ['nidn_pengembang', 'NIDN Pengembang RPS'],
-                    ['koordinator_rmk', 'Koordinator RMK'],
-                    ['kaprodi', 'Ketua Program Studi'],
-                    ['nidn_kaprodi', 'NIDN Kaprodi'],
-                    ['ketua_stikes', 'Ketua STIKes Ibnu Sina Ajibarang'],
-                    ['nidn_ketua_stikes', 'NIDN Ketua STIKes'],
-                    ['wakil_ketua_i', 'Wakil Ketua I Bidang Akademik'],
-                    ['nidn_wakil_ketua_i', 'NIDN Wakil Ketua I'],
-                  ].map(([key, label]) => (
-                    <tr key={key}>
-                      <td className="w-56 font-medium text-gray-700">{label}</td>
-                      <td>
-                        <input
-                          type="text"
-                          value={c[key] || ''}
-                          onChange={(e) => updateField(key, e.target.value)}
-                          placeholder={label}
-                        />
-                      </td>
-                    </tr>
-                  ))}
+                  <tr>
+                    <td className="w-56 font-medium text-gray-700">Koordinator RMK</td>
+                    <td>
+                      <input
+                        type="text"
+                        value={c.koordinator_rmk || ''}
+                        onChange={(e) => updateField('koordinator_rmk', e.target.value)}
+                        placeholder="Koordinator RMK"
+                      />
+                    </td>
+                  </tr>
                 </tbody>
               </table>
             </section>
@@ -687,39 +807,6 @@ export function Editor({ project, onUpdate, onSave, onSaveAs, onExport, onOpenAI
             </section>
           )}
 
-          {/* === DOSEN & PRASYARAT === */}
-          {activeSection === 'dosen_prasyarat' && (
-            <section className="editor-content">
-              <h2 className="text-lg font-bold mb-4">X. DOSEN PENGAMPU & MATA KULIAH PRASYARAT</h2>
-              <table className="w-full">
-                <tbody>
-                  <tr>
-                    <td className="w-56 font-medium text-gray-700">Dosen Pengampu</td>
-                    <td>
-                      <input
-                        type="text"
-                        value={c.dosen_pengampu || ''}
-                        onChange={(e) => updateField('dosen_pengampu', e.target.value)}
-                        placeholder="Nama dosen pengampu"
-                      />
-                    </td>
-                  </tr>
-                  <tr>
-                    <td className="w-56 font-medium text-gray-700">Mata Kuliah Prasyarat</td>
-                    <td>
-                      <input
-                        type="text"
-                        value={c.matakuliah_syarat || ''}
-                        onChange={(e) => updateField('matakuliah_syarat', e.target.value)}
-                        placeholder="Kode dan nama MK prasyarat (jika ada)"
-                      />
-                    </td>
-                  </tr>
-                </tbody>
-              </table>
-            </section>
-          )}
-
           {/* === TABEL PERTEMUAN === */}
           {activeSection === 'pertemuan' && (
             <section className="editor-content">
@@ -873,7 +960,7 @@ export function Editor({ project, onUpdate, onSave, onSaveAs, onExport, onOpenAI
                       <p className="text-sm text-gray-500 mb-2">Dibuat di Tempat,</p>
                       <div className="h-20"></div>
                       <div className="border-t w-full mx-auto mb-2"></div>
-                      <p className="font-medium">{c.dosen_pengampu || c.pengembang_rps || '.........................'}</p>
+                      <p className="font-medium">{c.dosen_pengampu || '.........................'}</p>
                       <p className="text-xs text-gray-500">NIDN. {c.nidn_pengembang || '...........'}</p>
                       <p className="text-xs text-gray-500">Dosen Pengampu</p>
                     </td>
@@ -925,6 +1012,33 @@ export function Editor({ project, onUpdate, onSave, onSaveAs, onExport, onOpenAI
           </button>
         ))}
       </div>
+
+      {/* Context menu */}
+      {contextMenu && (
+        <div className="context-menu" style={{ left: contextMenu.x, top: contextMenu.y }} onClick={closeContextMenu}>
+          <button className="context-menu-item" onClick={() => { handleCut(); closeContextMenu() }}>
+            <span className="context-menu-icon">✂</span> Cut
+          </button>
+          <button className="context-menu-item" onClick={() => { handleCopy(); closeContextMenu() }}>
+            <span className="context-menu-icon">📄</span> Copy
+          </button>
+          <button className="context-menu-item" onClick={() => { handlePaste(); closeContextMenu() }}>
+            <span className="context-menu-icon">📋</span> Paste
+          </button>
+        </div>
+      )}
+
+      {/* Toast notification */}
+      {toast && (
+        <div className={`toast-notification toast-${toast.type}`}>
+          <span className="toast-icon">
+            {toast.type === 'info' && '✓'}
+            {toast.type === 'warning' && '⚠'}
+            {toast.type === 'error' && '✕'}
+          </span>
+          <span className="toast-message">{toast.message}</span>
+        </div>
+      )}
     </div>
   )
 }

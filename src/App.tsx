@@ -4,6 +4,7 @@ import { Editor } from './components/Editor'
 import { StartScreen } from './components/StartScreen'
 import { AISettingsDialog } from './components/AISettingsDialog'
 import { ImportDialog } from './components/ImportDialog'
+import { GuidePage, guideSections } from './components/GuidePage'
 import { exportDocx, exportPdf } from './services/export'
 import { logger } from './utils/logger'
 
@@ -21,14 +22,19 @@ const defaultContent: Record<string, string> = {
   sks_t: '',
   sks_p: '',
   semester: '',
-  dosen: '',
+  dosen_pengampu: '',
+  pengembang_rps: '',
+  nidn_pengembang: '',
+  kaprodi: '',
+  nidn_kaprodi: '',
+  ketua_stikes: '',
+  nidn_ketua_stikes: '',
+  wakil_ketua_i: '',
+  nidn_wakil_ketua_i: '',
   semester_akademik: '',
   tgl_penyusunan: '',
   // Otorisasi
-  pengembang_rps: '',
   koordinator_rmk: '',
-  kaprodi: '',
-  ketua_stikes: '',
   // CPL, CPMK, Sub-CPMK (structured list: JSON string of {label, deskripsi}[])
   cpl: JSON.stringify([
     { label: 'CPL-1', deskripsi: '' },
@@ -69,16 +75,9 @@ const defaultContent: Record<string, string> = {
   pustaka_utama: '',
   pustaka_pendukung: '',
   // Dosen & Prasyarat
-  dosen_pengampu: '',
   matakuliah_syarat: '',
   // Tabel Pertemuan
   pertemuan: '[]',
-  // Identitas Dosen
-  nidn_pengembang: '',
-  nidn_kaprodi: '',
-  nidn_ketua_stikes: '',
-  wakil_ketua_i: '',
-  nidn_wakil_ketua_i: '',
 }
 
 function App() {
@@ -87,6 +86,7 @@ function App() {
   const [recentFiles, setRecentFiles] = useState<Array<{ path: string; name: string; openedAt: string }>>([])
   const [showAISettings, setShowAISettings] = useState(false)
   const [showImport, setShowImport] = useState(false)
+  const [activeGuide, setActiveGuide] = useState<string | null>(null)
   const handleNewProject = (content?: Record<string, string>) => {
     logger.info('APP', 'project.new', { withContent: !!content })
     setProject({ filePath: null, content: content || { ...defaultContent } })
@@ -235,18 +235,22 @@ function App() {
 
   return (
     <div className="flex h-screen bg-gray-100">
-      <Editor
-        project={project!}
-        onUpdate={(content) => setProject({ ...project!, content })}
-        onSave={handleSaveProject}
-        onSaveAs={handleSaveAs}
-        onExport={handleExport}
-        onOpenAISettings={() => setShowAISettings(true)}
-        onGoHome={() => {
-          logger.info('APP', 'navigate_home')
-          setShowStart(true)
-        }}
-      />
+      {activeGuide && guideSections.includes(activeGuide) ? (
+        <GuidePage section={activeGuide} onBack={() => setActiveGuide(null)} />
+      ) : (
+        <Editor
+          project={project!}
+          onUpdate={(content) => setProject({ ...project!, content })}
+          onSave={handleSaveProject}
+          onExport={handleExport}
+          onOpenAISettings={() => setShowAISettings(true)}
+          onGoHome={() => {
+            logger.info('APP', 'navigate_home')
+            setShowStart(true)
+          }}
+          onOpenGuide={(section) => setActiveGuide(section)}
+        />
+      )}
       <AISettingsDialog open={showAISettings} onClose={() => setShowAISettings(false)} />
       <ImportDialog open={showImport} onClose={() => setShowImport(false)} onImport={(data) => {
         logger.info('APP', 'project.import_data', { fields: Object.keys(data) })

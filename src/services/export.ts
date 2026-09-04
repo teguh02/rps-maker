@@ -318,7 +318,7 @@ export async function exportDocx(data: ExportData, filePath: string): Promise<vo
                 new TableCell({
                   children: [
                     new Paragraph({ spacing: { before: 100 } }),
-                    new Paragraph({ children: [new TextRun({ text: `( ${c.dosen_pengampu || c.pengembang_rps || '.................'} )`, bold: true })], alignment: AlignmentType.CENTER }),
+                    new Paragraph({ children: [new TextRun({ text: `( ${c.dosen_pengampu || '.................'} )`, bold: true })], alignment: AlignmentType.CENTER }),
                     new Paragraph({ children: [new TextRun({ text: `NIDN. ${c.nidn_pengembang || '...........'}`, size: 18 })], alignment: AlignmentType.CENTER }),
                     new Paragraph({ children: [new TextRun({ text: 'Dosen Pengampu', size: 18 })], alignment: AlignmentType.CENTER }),
                   ],
@@ -530,7 +530,7 @@ export async function exportPdf(data: ExportData, filePath: string): Promise<voi
           <div style="text-align: center; width: 200px;">
             <div style="height: 60px;"></div>
             <div style="border-top: 1px solid #000;"></div>
-            <p style="font-weight: bold; margin-top: 4px;">${c.dosen_pengampu || c.pengembang_rps || 'Dosen Pengampu'}</p>
+            <p style="font-weight: bold; margin-top: 4px;">${c.dosen_pengampu || 'Dosen Pengampu'}</p>
             <p style="font-size: 10pt;">NIDN. ${c.nidn_pengembang || '...'}</p>
             <p style="font-size: 10pt;">Dosen Pengampu</p>
           </div>

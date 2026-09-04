@@ -152,22 +152,52 @@ export function InfoIcon({ size = 20, className = '' }: IconProps) {
   )
 }
 
-export function TableIcon({ size = 20, className = '' }: IconProps) {
+export function UndoIcon({ size = 20, className = '' }: IconProps) {
   return (
     <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}>
-      <rect x="3" y="3" width="18" height="18" rx="2" ry="2" />
-      <line x1="3" y1="9" x2="21" y2="9" />
-      <line x1="3" y1="15" x2="21" y2="15" />
-      <line x1="9" y1="3" x2="9" y2="21" />
-      <line x1="15" y1="3" x2="15" y2="21" />
+      <path d="M3 12h7v-7l7 7-7 7V12H3z" />
     </svg>
   )
 }
 
-export function ChevronDownIcon({ size = 12, className = '' }: IconProps) {
+export function RedoIcon({ size = 20, className = '' }: IconProps) {
   return (
     <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}>
-      <polyline points="6 9 12 15 18 9" />
+      <path d="M21 12h-7v7l-7-7 7-7v7h7z" />
+    </svg>
+  )
+}
+
+export function ZoomInIcon({ size = 20, className = '' }: IconProps) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}>
+      <circle cx="11" cy="11" r="8" />
+      <line x1="21" y1="21" x2="16.65" y2="16.65" />
+      <line x1="11" y1="8" x2="11" y2="14" />
+      <line x1="8" y1="11" x2="14" y2="11" />
+    </svg>
+  )
+}
+
+export function ZoomOutIcon({ size = 20, className = '' }: IconProps) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}>
+      <circle cx="11" cy="11" r="8" />
+      <line x1="11" y1="8" x2="11" y2="14" />
+      <line x1="8" y1="11" x2="14" y2="11" />
+    </svg>
+  )
+}
+
+export function ZoomResetIcon({ size = 20, className = '' }: IconProps) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}>
+      <path d="M17 14a2 2 0 0 1-2 2H9a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2v6z" />
+      <path d="M14 14v2a2 2 0 0 1-2 2H9a2 2 0 0 1-2-2v-2" />
+      <path d="M10 14h4" />
+      <path d="M14 14v-2" />
+      <path d="M10 14v-2" />
+      <path d="M14 14h-4" />
     </svg>
   )
 }

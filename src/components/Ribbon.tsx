@@ -1,34 +1,45 @@
 import { useState } from 'react'
 import {
-  HomeIcon, FileIcon, FolderOpenIcon, SaveIcon, SaveAsIcon,
+  HomeIcon, FileIcon, FolderOpenIcon, SaveIcon,
   ExportWordIcon, ExportPdfIcon, SparklesIcon, SettingsIcon,
   CopyIcon, CutIcon, PasteIcon, KeyboardIcon, InfoIcon,
+  UndoIcon, RedoIcon, ZoomInIcon, ZoomOutIcon, ZoomResetIcon
 } from './icons'
 import { logger } from '../utils/logger'
 
 interface RibbonProps {
   onSave: () => void
-  onSaveAs: () => void
   onExport?: (format: 'pdf' | 'docx') => void
   onOpenAISettings?: () => void
   onGoHome?: () => void
+  onCut?: () => void
+  onCopy?: () => void
+  onPaste?: () => void
+  onUndo?: () => void
+  onRedo?: () => void
+  canUndo?: boolean
+  canRedo?: boolean
+  onZoomIn?: () => void
+  onZoomOut?: () => void
+  onZoomReset?: () => void
   activeSection?: string
   onGenerateAI?: () => void
   aiLoading?: boolean
 }
 
-type TabId = 'file' | 'home' | 'ai' | 'help'
+type TabId = 'file' | 'home' | 'ai' | 'view' | 'help'
 
 const tabs: { id: TabId; label: string }[] = [
   { id: 'file', label: 'File' },
   { id: 'home', label: 'Home' },
   { id: 'ai', label: 'AI' },
+  { id: 'view', label: 'View' },
   { id: 'help', label: 'Help' },
 ]
 
 const AI_SUPPORTED_SECTIONS = ['cpl', 'cpmk', 'sub_cpmk', 'deskripsi_mk', 'bahan_kajian', 'penilaian', 'pustaka']
 
-export function Ribbon({ onSave, onSaveAs, onExport, onOpenAISettings, onGoHome, activeSection, onGenerateAI, aiLoading }: RibbonProps) {
+export function Ribbon({ onSave, onExport, onOpenAISettings, onGoHome, activeSection, onGenerateAI, aiLoading, onCut, onCopy, onPaste, onUndo, onRedo, canUndo, canRedo, onZoomIn, onZoomOut, onZoomReset }: RibbonProps) {
   const [activeTab, setActiveTab] = useState<TabId>('home')
   const [showContent, setShowContent] = useState(true)
 
@@ -78,7 +89,6 @@ export function Ribbon({ onSave, onSaveAs, onExport, onOpenAISettings, onGoHome,
             </RibbonGroup>
             <RibbonGroup label="Save">
               <RibbonButton icon={<SaveIcon size={20} />} label="Save" onClick={onSave} />
-              <RibbonButton icon={<SaveAsIcon size={20} />} label="Save As" onClick={onSaveAs} />
             </RibbonGroup>
             <RibbonGroup label="Export">
               <RibbonButton icon={<ExportWordIcon size={20} />} label="Word" onClick={() => onExport?.('docx')} />
@@ -88,11 +98,17 @@ export function Ribbon({ onSave, onSaveAs, onExport, onOpenAISettings, onGoHome,
         )}
 
         {activeTab === 'home' && (
-          <RibbonGroup label="Clipboard">
-            <RibbonButton icon={<CutIcon size={20} />} label="Cut" onClick={() => document.execCommand('cut')} />
-            <RibbonButton icon={<CopyIcon size={20} />} label="Copy" onClick={() => document.execCommand('copy')} />
-            <RibbonButton icon={<PasteIcon size={20} />} label="Paste" onClick={() => document.execCommand('paste')} />
-          </RibbonGroup>
+          <>
+            <RibbonGroup label="Clipboard">
+              <RibbonButton icon={<CutIcon size={20} />} label="Cut" onClick={onCut} />
+              <RibbonButton icon={<CopyIcon size={20} />} label="Copy" onClick={onCopy} />
+              <RibbonButton icon={<PasteIcon size={20} />} label="Paste" onClick={onPaste} />
+            </RibbonGroup>
+            <RibbonGroup label="History">
+              <RibbonButton icon={<UndoIcon size={20} />} label="Undo" onClick={onUndo} disabled={!canUndo} />
+              <RibbonButton icon={<RedoIcon size={20} />} label="Redo" onClick={onRedo} disabled={!canRedo} />
+            </RibbonGroup>
+          </>
         )}
 
         {activeTab === 'ai' && (
@@ -113,6 +129,14 @@ export function Ribbon({ onSave, onSaveAs, onExport, onOpenAISettings, onGoHome,
               <RibbonButton icon={<SettingsIcon size={20} />} label="AI Settings" onClick={() => onOpenAISettings?.()} />
             </RibbonGroup>
           </>
+        )}
+
+        {activeTab === 'view' && (
+          <RibbonGroup label="Zoom">
+            <RibbonButton icon={<ZoomInIcon size={20} />} label="Zoom In" onClick={onZoomIn} />
+            <RibbonButton icon={<ZoomOutIcon size={20} />} label="Zoom Out" onClick={onZoomOut} />
+            <RibbonButton icon={<ZoomResetIcon size={20} />} label="Reset" onClick={onZoomReset} />
+          </RibbonGroup>
         )}
 
         {activeTab === 'help' && (

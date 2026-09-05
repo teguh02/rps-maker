@@ -437,6 +437,137 @@ body {
   white-space: nowrap;
 }
 
+/* ── Row action buttons (↑↓ / 🗑) ── */
+.row-action-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border: 1px solid #d1d5db;
+  border-radius: 4px;
+  background: #fff;
+  color: #4b5563;
+  cursor: pointer;
+  transition: background 0.12s, border-color 0.12s, color 0.12s, box-shadow 0.12s;
+  flex-shrink: 0;
+}
+
+.row-action-btn:hover:not(:disabled) {
+  background: #eff6ff;
+  border-color: #93c5fd;
+  color: #2563eb;
+  box-shadow: 0 1px 3px rgba(37, 99, 235, 0.2);
+}
+
+.row-action-btn:active:not(:disabled) {
+  background: #dbeafe;
+}
+
+.row-action-btn:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+}
+
+.row-action-btn-delete {
+  color: #dc2626;
+}
+
+.row-action-btn-delete:hover:not(:disabled) {
+  background: #fef2f2;
+  border-color: #fca5a5;
+  color: #dc2626;
+  box-shadow: 0 1px 3px rgba(220, 38, 38, 0.2);
+}
+
+/* ── Ribbon select (font family / size) ── */
+.ribbon-select {
+  height: 30px;
+  padding: 0 4px;
+  border: 1px solid #d1d5db;
+  border-radius: 3px;
+  font-size: 0.75rem;
+  color: #374151;
+  background: #fff;
+  cursor: pointer;
+  min-width: 88px;
+  max-width: 150px;
+}
+
+.ribbon-select:focus {
+  outline: none;
+  border-color: #3b82f6;
+  box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.15);
+}
+
+.ribbon-select:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.ribbon-btn-active {
+  background: #dbeafe !important;
+  border-color: #93c5fd !important;
+}
+
+.ribbon-btn-active .ribbon-btn-icon {
+  color: #1d4ed8 !important;
+}
+
+/* ── Compact RTE (table cells) ── */
+.rte-compact .ProseMirror {
+  padding: 4px 6px;
+  min-height: 30px;
+  font-size: 0.8125rem;
+  line-height: 1.4;
+}
+
+.rte-compact .ProseMirror p {
+  margin-bottom: 0.25rem;
+  line-height: 1.4;
+}
+
+.rte-compact .ProseMirror ul,
+.rte-compact .ProseMirror ol {
+  margin-left: 1rem;
+  margin-bottom: 0.25rem;
+}
+
+/* Placeholder for TipTap editors */
+.ProseMirror p.is-editor-empty:first-child::before {
+  content: attr(data-placeholder);
+  float: left;
+  color: #adb5bd;
+  pointer-events: none;
+  height: 0;
+}
+
+/* ── Auto-save indicator ── */
+.autosave-indicator {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin-left: auto;
+  padding: 6px 14px;
+  font-size: 0.75rem;
+  color: rgba(255, 255, 255, 0.85);
+  white-space: nowrap;
+}
+
+.autosave-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #4ade80;
+  box-shadow: 0 0 4px rgba(74, 222, 128, 0.8);
+  animation: autosave-pulse 2s ease-in-out infinite;
+}
+
+@keyframes autosave-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.4; }
+}
+
 /* ── AI generate button ── */
 .btn-ai {
   display: inline-flex;

@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef, useCallback } from 'react'
 
 import { Editor } from './components/Editor'
 import { StartScreen } from './components/StartScreen'
@@ -87,8 +87,21 @@ function App() {
   const [showAISettings, setShowAISettings] = useState(false)
   const [showImport, setShowImport] = useState(false)
   const [activeGuide, setActiveGuide] = useState<string | null>(null)
+  const [autoSaveActive, setAutoSaveActive] = useState(false)
+  const [lastAutoSaveAt, setLastAutoSaveAt] = useState<string | null>(null)
+  const projectRef = useRef(project)
+  const lastSavedContentRef = useRef<string>('')
+
+  // Keep a ref of the latest project so the auto-save interval always sees fresh data.
+  useEffect(() => {
+    projectRef.current = project
+  }, [project])
+
   const handleNewProject = (content?: Record<string, string>) => {
     logger.info('APP', 'project.new', { withContent: !!content })
+    lastSavedContentRef.current = ''
+    setAutoSaveActive(false)
+    setLastAutoSaveAt(null)
     setProject({ filePath: null, content: content || { ...defaultContent } })
     setShowStart(false)
   }
@@ -98,7 +111,9 @@ function App() {
     const result = await window.electronAPI.openFile()
     if (result) {
       logger.info('APP', 'project.loaded', { filePath: result.filePath })
+      lastSavedContentRef.current = JSON.stringify(result.data)
       setProject({ filePath: result.filePath, content: result.data })
+      setAutoSaveActive(true)
       setShowStart(false)
       window.electronAPI.addRecent(result.filePath)
       loadRecentFiles()
@@ -119,7 +134,10 @@ function App() {
     const savedPath = await window.electronAPI.saveFile(data)
     if (savedPath) {
       logger.info('APP', 'project.saved', { filePath: savedPath })
+      lastSavedContentRef.current = JSON.stringify(project.content)
       setProject({ ...project, filePath: savedPath })
+      setAutoSaveActive(true)
+      setLastAutoSaveAt(new Date().toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit', second: '2-digit' }))
       window.electronAPI.addRecent(savedPath)
       loadRecentFiles()
     } else {
@@ -139,13 +157,30 @@ function App() {
     const savedPath = await window.electronAPI.saveFileAs(data)
     if (savedPath) {
       logger.info('APP', 'project.saved', { filePath: savedPath })
+      lastSavedContentRef.current = JSON.stringify(project.content)
       setProject({ ...project, filePath: savedPath })
+      setAutoSaveActive(true)
+      setLastAutoSaveAt(new Date().toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit', second: '2-digit' }))
       window.electronAPI.addRecent(savedPath)
       loadRecentFiles()
     } else {
       logger.debug('APP', 'project.save_as_canceled')
     }
   }
+
+  const handleSilentSave = useCallback(async () => {
+    const p = projectRef.current
+    if (!p || !p.filePath) return false
+    const json = JSON.stringify(p.content)
+    if (json === lastSavedContentRef.current) return true
+    const ok = await window.electronAPI.saveProjectSilent(p.filePath, p.content)
+    if (ok) {
+      lastSavedContentRef.current = json
+      setLastAutoSaveAt(new Date().toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit', second: '2-digit' }))
+      logger.debug('APP', 'project.auto_saved', { filePath: p.filePath })
+    }
+    return ok
+  }, [])
 
   const handleExport = async (format: 'pdf' | 'docx' = 'pdf') => {
     if (!project) return
@@ -177,7 +212,9 @@ function App() {
     const result = await window.electronAPI.openProject(filePath)
     if (result) {
       logger.info('APP', 'project.loaded', { filePath: result.filePath })
+      lastSavedContentRef.current = JSON.stringify(result.data)
       setProject({ filePath: result.filePath, content: result.data })
+      setAutoSaveActive(true)
       setShowStart(false)
       loadRecentFiles()
     } else {
@@ -191,20 +228,24 @@ function App() {
     logger.debug('APP', 'recent_files.loaded', { count: recent?.length || 0 })
   }
 
+  // Keep latest handler references so the one-time listener effect below never uses stale closures.
+  const handlersRef = useRef({ handleNewProject, handleSaveProject, handleSaveAs, handleExport })
+  handlersRef.current = { handleNewProject, handleSaveProject, handleSaveAs, handleExport }
+
   useEffect(() => {
     loadRecentFiles()
 
-    const unsubNew = window.electronAPI.onMenuNew(() => handleNewProject())
-    const unsubSave = window.electronAPI.onMenuSave(() => handleSaveProject())
-    const unsubExport = window.electronAPI.onMenuExport(() => handleExport())
+    const unsubNew = window.electronAPI.onMenuNew(() => handlersRef.current.handleNewProject())
+    const unsubSave = window.electronAPI.onMenuSave(() => handlersRef.current.handleSaveProject())
+    const unsubExport = window.electronAPI.onMenuExport(() => handlersRef.current.handleExport())
     const unsubImport = window.electronAPI.onMenuImport(() => setShowImport(true))
     const unsubAI = window.electronAPI.onOpenAISettings(() => setShowAISettings(true))
 
     const handleKeyDown = (e: KeyboardEvent) => {
       if ((e.ctrlKey || e.metaKey) && e.key === 's') {
         e.preventDefault()
-        if (e.shiftKey) handleSaveAs()
-        else handleSaveProject()
+        if (e.shiftKey) handlersRef.current.handleSaveAs()
+        else handlersRef.current.handleSaveProject()
       }
     }
     window.addEventListener('keydown', handleKeyDown)
@@ -217,6 +258,18 @@ function App() {
       window.removeEventListener('keydown', handleKeyDown)
     }
   }, [])
+
+  // Auto-save: only active once the project has a real file path (saved manually first).
+  useEffect(() => {
+    if (!autoSaveActive) return
+    logger.info('APP', 'project.auto_save_enabled')
+    const interval = window.setInterval(() => {
+      void handleSilentSave()
+    }, 15_000)
+    // Flush once immediately after activation (covers changes made right before enabling)
+    void handleSilentSave()
+    return () => window.clearInterval(interval)
+  }, [autoSaveActive, handleSilentSave])
 
   if (showStart) {
     return (
@@ -249,6 +302,8 @@ function App() {
             setShowStart(true)
           }}
           onOpenGuide={(section) => setActiveGuide(section)}
+          autoSaveActive={autoSaveActive}
+          lastAutoSaveAt={lastAutoSaveAt}
         />
       )}
       <AISettingsDialog open={showAISettings} onClose={() => setShowAISettings(false)} />

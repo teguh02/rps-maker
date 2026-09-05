@@ -1,10 +1,14 @@
-import { useState } from 'react'
+import { useState, useSyncExternalStore } from 'react'
 import {
   HomeIcon, FileIcon, FolderOpenIcon, SaveIcon,
   ExportWordIcon, ExportPdfIcon, SparklesIcon, SettingsIcon,
   CopyIcon, CutIcon, PasteIcon, KeyboardIcon, InfoIcon,
-  UndoIcon, RedoIcon, ZoomInIcon, ZoomOutIcon, ZoomResetIcon
+  UndoIcon, RedoIcon, ZoomInIcon, ZoomOutIcon, ZoomResetIcon,
+  BoldIcon, ItalicIcon, UnderlineIcon, StrikeIcon,
+  BulletListIcon, NumberedListIcon, ClearFormatIcon,
+  AlignLeftIcon, AlignCenterIcon, AlignRightIcon, AlignJustifyIcon,
 } from './icons'
+import { editorRegistry } from '../services/editorRegistry'
 import { logger } from '../utils/logger'
 
 interface RibbonProps {
@@ -39,9 +43,29 @@ const tabs: { id: TabId; label: string }[] = [
 
 const AI_SUPPORTED_SECTIONS = ['cpl', 'cpmk', 'sub_cpmk', 'deskripsi_mk', 'bahan_kajian', 'penilaian', 'pustaka']
 
-export function Ribbon({ onSave, onExport, onOpenAISettings, onGoHome, activeSection, onGenerateAI, aiLoading, onCut, onCopy, onPaste, onUndo, onRedo, canUndo, canRedo, onZoomIn, onZoomOut, onZoomReset }: RibbonProps) {
+const FONT_FAMILIES = [
+  'Times New Roman',
+  'Arial',
+  'Calibri',
+  'Cambria',
+  'Georgia',
+  'Courier New',
+  'Tahoma',
+  'Verdana',
+  'Segoe UI',
+  'Garamond',
+]
+
+const FONT_SIZES = ['8pt', '9pt', '10pt', '11pt', '12pt', '14pt', '16pt', '18pt', '20pt', '24pt', '28pt', '36pt', '48pt']
+
+export function Ribbon({
+  onSave, onExport, onOpenAISettings, onGoHome, activeSection, onGenerateAI, aiLoading,
+  onCut, onCopy, onPaste, onUndo, onRedo, canUndo, canRedo,
+  onZoomIn, onZoomOut, onZoomReset,
+}: RibbonProps) {
   const [activeTab, setActiveTab] = useState<TabId>('home')
   const [showContent, setShowContent] = useState(true)
+  const fmt = useSyncExternalStore(editorRegistry.subscribe, editorRegistry.getSnapshot, editorRegistry.getSnapshot)
 
   const handleTabClick = (tabId: TabId) => {
     if (activeTab === tabId) {
@@ -50,6 +74,16 @@ export function Ribbon({ onSave, onExport, onOpenAISettings, onGoHome, activeSec
       setActiveTab(tabId)
       setShowContent(true)
     }
+  }
+
+  const runFormat = (command: string, value?: string) => {
+    logger.debug('Ribbon', 'ribbon.format', { command, value, editorActive: fmt.active })
+    editorRegistry.runCommand(command, value)
+  }
+
+  const preventBlur = (e: React.MouseEvent) => {
+    // Keep focus inside the rich text editor while clicking formatting controls
+    e.preventDefault()
   }
 
   return (
@@ -108,6 +142,38 @@ export function Ribbon({ onSave, onExport, onOpenAISettings, onGoHome, activeSec
               <RibbonButton icon={<UndoIcon size={20} />} label="Undo" onClick={onUndo} disabled={!canUndo} />
               <RibbonButton icon={<RedoIcon size={20} />} label="Redo" onClick={onRedo} disabled={!canRedo} />
             </RibbonGroup>
+            <RibbonGroup label="Font">
+              <RibbonSelect
+                value={fmt.fontFamily || ''}
+                placeholder="Font"
+                options={FONT_FAMILIES}
+                disabled={!fmt.active}
+                onChange={(v) => runFormat('fontFamily', v)}
+              />
+              <RibbonSelect
+                value={fmt.fontSize || ''}
+                placeholder="Size"
+                options={FONT_SIZES}
+                disabled={!fmt.active}
+                onChange={(v) => runFormat('fontSize', v)}
+                width={64}
+              />
+            </RibbonGroup>
+            <RibbonGroup label="Format">
+              <RibbonButton icon={<BoldIcon size={20} />} label="Bold" active={fmt.active && fmt.bold} disabled={!fmt.active} onMouseDown={preventBlur} onClick={() => runFormat('bold')} />
+              <RibbonButton icon={<ItalicIcon size={20} />} label="Italic" active={fmt.active && fmt.italic} disabled={!fmt.active} onMouseDown={preventBlur} onClick={() => runFormat('italic')} />
+              <RibbonButton icon={<UnderlineIcon size={20} />} label="Underline" active={fmt.active && fmt.underline} disabled={!fmt.active} onMouseDown={preventBlur} onClick={() => runFormat('underline')} />
+              <RibbonButton icon={<StrikeIcon size={20} />} label="Strikethrough" active={fmt.active && fmt.strike} disabled={!fmt.active} onMouseDown={preventBlur} onClick={() => runFormat('strike')} />
+              <RibbonButton icon={<ClearFormatIcon size={20} />} label="Clear" disabled={!fmt.active} onMouseDown={preventBlur} onClick={() => runFormat('clearFormat')} />
+            </RibbonGroup>
+            <RibbonGroup label="Paragraph">
+              <RibbonButton icon={<BulletListIcon size={20} />} label="Bullets" active={fmt.active && fmt.bulletList} disabled={!fmt.active} onMouseDown={preventBlur} onClick={() => runFormat('bulletList')} />
+              <RibbonButton icon={<NumberedListIcon size={20} />} label="Numbering" active={fmt.active && fmt.orderedList} disabled={!fmt.active} onMouseDown={preventBlur} onClick={() => runFormat('orderedList')} />
+              <RibbonButton icon={<AlignLeftIcon size={20} />} label="Align Left" active={fmt.active && fmt.align === 'left'} disabled={!fmt.active} onMouseDown={preventBlur} onClick={() => runFormat('align', 'left')} />
+              <RibbonButton icon={<AlignCenterIcon size={20} />} label="Center" active={fmt.active && fmt.align === 'center'} disabled={!fmt.active} onMouseDown={preventBlur} onClick={() => runFormat('align', 'center')} />
+              <RibbonButton icon={<AlignRightIcon size={20} />} label="Align Right" active={fmt.active && fmt.align === 'right'} disabled={!fmt.active} onMouseDown={preventBlur} onClick={() => runFormat('align', 'right')} />
+              <RibbonButton icon={<AlignJustifyIcon size={20} />} label="Justify" active={fmt.active && fmt.align === 'justify'} disabled={!fmt.active} onMouseDown={preventBlur} onClick={() => runFormat('align', 'justify')} />
+            </RibbonGroup>
           </>
         )}
 
@@ -160,20 +226,62 @@ function RibbonGroup({ label, children }: { label: string; children: React.React
   )
 }
 
-function RibbonButton({ icon, label, onClick, disabled, loading }: { icon: React.ReactNode; label: string; onClick: () => void; disabled?: boolean; loading?: boolean }) {
+function RibbonButton({
+  icon, label, onClick, disabled, loading, active, onMouseDown,
+}: {
+  icon: React.ReactNode
+  label: string
+  onClick?: () => void
+  disabled?: boolean
+  loading?: boolean
+  active?: boolean
+  onMouseDown?: (e: React.MouseEvent) => void
+}) {
   return (
     <button
-      className={`ribbon-btn ${disabled ? 'ribbon-btn-disabled' : ''}`}
+      className={`ribbon-btn ${disabled ? 'ribbon-btn-disabled' : ''} ${active ? 'ribbon-btn-active' : ''}`}
+      onMouseDown={onMouseDown}
       onClick={() => {
-        if (!disabled) {
+        if (!disabled && onClick) {
           onClick()
         }
       }}
       disabled={disabled}
+      title={label}
     >
       <span className="ribbon-btn-icon">{loading ? <SpinnerIcon /> : icon}</span>
       <span className="ribbon-btn-label">{loading ? 'Generating...' : label}</span>
     </button>
+  )
+}
+
+function RibbonSelect({
+  value, placeholder, options, disabled, onChange, onMouseDown, width,
+}: {
+  value: string
+  placeholder: string
+  options: string[]
+  disabled?: boolean
+  onChange: (value: string) => void
+  onMouseDown?: (e: React.MouseEvent) => void
+  width?: number
+}) {
+  return (
+    <select
+      className="ribbon-select"
+      style={width ? { width } : undefined}
+      value={value}
+      disabled={disabled}
+      onMouseDown={onMouseDown}
+      onChange={(e) => {
+        if (e.target.value) onChange(e.target.value)
+      }}
+    >
+      <option value="">{placeholder}</option>
+      {options.map(opt => (
+        <option key={opt} value={opt}>{opt}</option>
+      ))}
+    </select>
   )
 }
 

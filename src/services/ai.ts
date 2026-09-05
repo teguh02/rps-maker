@@ -1,6 +1,7 @@
 // AI Service — multi-provider OpenAI-compatible API
 
 import { logger } from '../utils/logger'
+import { stripHtml } from '../utils/html'
 
 interface AISettings {
   provider: 'free' | 'custom'
@@ -132,7 +133,7 @@ export async function generateWithAI(options: GenerateOptions): Promise<string> 
       userPrompt: options.userPrompt,
     })
 
-    if (result.ok) {
+    if (result.ok && result.content) {
       logger.info('AI', 'ai.api_call_success', { section: options.section, responseLength: result.content.length })
       return result.content
     }
@@ -158,14 +159,33 @@ Panduan penting:
 
   const c = content
 
+  // Structured list fields are stored as JSON arrays whose deskripsi may now contain HTML
+  // (rich text). Flatten them to plain text for the AI prompt.
+  const flattenList = (json: string): string => {
+    try {
+      const arr = JSON.parse(json || '[]')
+      if (!Array.isArray(arr)) return stripHtml(json)
+      return arr.map((item: { label?: string; deskripsi?: string }) => {
+        const label = item.label || ''
+        const deskripsi = stripHtml(item.deskripsi || '')
+        return label ? `${label}: ${deskripsi}` : deskripsi
+      }).filter(Boolean).join('\n')
+    } catch {
+      return stripHtml(json)
+    }
+  }
+
+  const plain = (key: string): string => stripHtml(c[key] || '')
+  const list = (key: string): string => flattenList(c[key])
+
   switch (section) {
     case 'cpl':
       return {
         section,
         systemPrompt: base + `\n\nAnda harus mengembalikan JSON array dengan format: [{"label":"CPL-1","deskripsi":"..."}]`,
-        userPrompt: `Buat CPL (Capaian Pembelajaran Lulusan) yang relevan untuk program studi "${c.prodi || ''}" di bawah Rumpun MK "${c.rumpun_mk || ''}".
+        userPrompt: `Buat CPL (Capaian Pembelajaran Lulusan) yang relevan untuk program studi "${plain('prodi')}" di bawah Rumpun MK "${plain('rumpun_mk')}".
 
-Mata Kuliah: ${c.mata_kuliah || ''} (T=${c.sks_t || '?'} P=${c.sks_p || '?'})
+Mata Kuliah: ${plain('mata_kuliah')} (T=${plain('sks_t')} P=${plain('sks_p')})
 
 CPL harus spesifik, terukur, dan menggunakan kata kerja operasional Taksonomi Bloom. Buat 4 CPL. Kembalikan HANYA JSON array, tanpa penjelasan tambahan.`,
       }
@@ -173,10 +193,10 @@ CPL harus spesifik, terukur, dan menggunakan kata kerja operasional Taksonomi Bl
       return {
         section,
         systemPrompt: base + `\n\nAnda harus mengembalikan JSON array dengan format: [{"label":"CPMK-1","deskripsi":"..."}]`,
-        userPrompt: `Buat CPMK (Capaian Pembelajaran Mata Kuliah) yang terukur untuk mata kuliah "${c.mata_kuliah || ''}" dengan SKS T=${c.sks_t || '?'} P=${c.sks_p || '?'}
+        userPrompt: `Buat CPMK (Capaian Pembelajaran Mata Kuliah) yang terukur untuk mata kuliah "${plain('mata_kuliah')}" dengan SKS T=${plain('sks_t')} P=${plain('sks_p')}
 
 CPL Program Studi:
-${c.cpl || 'Belum diisi'}
+${list('cpl') || 'Belum diisi'}
 
 Buat 4 CPMK dengan KKO Bloom yang beragam (misalnya: Memahami C2, Menganalisis C4, Mencipta C6). Setiap CPMK harus spesifik dan terukur. Kembalikan HANYA JSON array, tanpa penjelasan tambahan.`,
       }
@@ -187,7 +207,7 @@ Buat 4 CPMK dengan KKO Bloom yang beragam (misalnya: Memahami C2, Menganalisis C
         userPrompt: `Pecah CPMK berikut menjadi Sub-CPMK (kemampuan akhir tiap tahapan belajar) yang bisa diselesaikan dalam 1-2 pertemuan:
 
 CPMK:
-${c.cpmk || 'Belum diisi'}
+${list('cpmk') || 'Belum diisi'}
 
 Format Sub-CPMK gunakan notasi desimal (Sub-CPMK 1.1, 1.2, 2.1, dst). Buat minimal 8 Sub-CPMK. Kembalikan HANYA JSON array, tanpa penjelasan tambahan.`,
       }
@@ -195,10 +215,10 @@ Format Sub-CPMK gunakan notasi desimal (Sub-CPMK 1.1, 1.2, 2.1, dst). Buat minim
       return {
         section,
         systemPrompt: base,
-        userPrompt: `Deskripsikan mata kuliah "${c.mata_kuliah || ''}" secara singkat (3-5 kalimat).
+        userPrompt: `Deskripsikan mata kuliah "${plain('mata_kuliah')}" secara singkat (3-5 kalimat).
 
 Cakupan materi:
-${c.bahan_kajian || 'Belum diisi'}
+${list('bahan_kajian') || 'Belum diisi'}
 
 Deskripsi harus menjelaskan relevansi, cakupan materi, dan posisi mata kuliah dalam kurikulum program studi.`,
       }
@@ -206,10 +226,10 @@ Deskripsi harus menjelaskan relevansi, cakupan materi, dan posisi mata kuliah da
       return {
         section,
         systemPrompt: base + `\n\nAnda harus mengembalikan JSON array dengan format: [{"label":"1","deskripsi":"Judul Topik - Deskripsi singkat"}]`,
-        userPrompt: `Suggest bahan kajian relevan untuk mata kuliah "${c.mata_kuliah || ''}"
+        userPrompt: `Suggest bahan kajian relevan untuk mata kuliah "${plain('mata_kuliah')}"
 
 CPMK:
-${c.cpmk || 'Belum diisi'}
+${list('cpmk') || 'Belum diisi'}
 
 Buat 8 bahan kajian yang mencakup konsep dasar hingga aplikasi. Kembalikan HANYA JSON array, tanpa penjelasan tambahan.`,
       }
@@ -217,10 +237,10 @@ Buat 8 bahan kajian yang mencakup konsep dasar hingga aplikasi. Kembalikan HANYA
       return {
         section,
         systemPrompt: base + `\n\nAnda harus mengembalikan JSON array dengan format: [{"item":"Kehadiran","bobot":10}]`,
-        userPrompt: `Rancang format penilaian OBE untuk mata kuliah "${c.mata_kuliah || ''}"
+        userPrompt: `Rancang format penilaian OBE untuk mata kuliah "${plain('mata_kuliah')}"
 
 CPMK:
-${c.cpmk || 'Belum diisi'}
+${list('cpmk') || 'Belum diisi'}
 
 Buat komponen penilaian dengan:
 1. Komponen penilaian (Kehadiran, Partisipasi, Tugas, UTS, UAS, dll.)
@@ -232,7 +252,7 @@ Untuk pemenuhan IKU 7, bobot asesmen partisipatif (kehadiran + partisipasi + tug
       return {
         section,
         systemPrompt: base + `\n\nAnda harus mengembalikan JSON dengan format: {"pustaka_utama":"...","pustaka_pendukung":"..."}`,
-        userPrompt: `Suggest pustaka untuk mata kuliah "${c.mata_kuliah || ''}"
+        userPrompt: `Suggest pustaka untuk mata kuliah "${plain('mata_kuliah')}"
 
 Buat 2 kategori:
 1. Pustaka Utama: Buku teks utama yang digunakan (minimal 2)
@@ -246,7 +266,7 @@ Kembalikan HANYA JSON, tanpa penjelasan tambahan.`,
       return {
         section,
         systemPrompt: base,
-        userPrompt: `Generate konten untuk bagian ${section} dari RPS mata kuliah "${c.mata_kuliah || ''}" dalam format yang sesuai.`,
+        userPrompt: `Generate konten untuk bagian ${section} dari RPS mata kuliah "${plain('mata_kuliah')}" dalam format yang sesuai.`,
       }
   }
 }

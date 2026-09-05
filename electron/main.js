@@ -115,6 +115,18 @@ ipcMain.handle('dialog:open', async () => {
   };
 });
 
+async function writeRpsZip(filePath, content) {
+  const zip = new JSZip();
+  zip.file('document.json', JSON.stringify(content, null, 2));
+  zip.file('metadata.json', JSON.stringify({
+    appName: 'RPS Maker UNISINA',
+    version: '1.0.0',
+    savedAt: new Date().toISOString(),
+  }, null, 2));
+  const zipBuffer = await zip.generateAsync({ type: 'nodebuffer' });
+  fs.writeFileSync(filePath, zipBuffer);
+}
+
 ipcMain.handle('dialog:save', async (_, data) => {
   log.info('IPC', 'dialog:save');
   const result = await dialog.showSaveDialog(mainWindow, {
@@ -127,22 +139,30 @@ ipcMain.handle('dialog:save', async (_, data) => {
   }
 
   log.debug('IPC', 'dialog:save_file', { filePath: result.filePath });
-  const zip = new JSZip();
-  zip.file('document.json', JSON.stringify(data.content, null, 2));
-  zip.file('metadata.json', JSON.stringify({
-    appName: 'RPS Maker UNISINA',
-    version: '1.0.0',
-    savedAt: new Date().toISOString(),
-  }, null, 2));
-
-  const zipBuffer = await zip.generateAsync({ type: 'nodebuffer' });
-  fs.writeFileSync(result.filePath, zipBuffer);
+  await writeRpsZip(result.filePath, data.content);
 
   const recent = readRecent().filter(r => r.path !== result.filePath);
   recent.unshift({ path: result.filePath, name: path.basename(result.filePath), openedAt: new Date().toISOString() });
   writeRecent(recent.slice(0, 10));
 
   return result.filePath;
+});
+
+// Silent save — writes straight to an existing filePath without showing a dialog.
+// Used by the auto-save feature (only active after the user has saved manually once).
+ipcMain.handle('project:save-silent', async (_, filePath, content) => {
+  if (!filePath || !content) {
+    log.warn('IPC', 'project:save-silent_skipped', { hasPath: !!filePath, hasContent: !!content });
+    return false;
+  }
+  log.debug('IPC', 'project:save-silent', { filePath, size: Object.keys(content).length });
+  try {
+    await writeRpsZip(filePath, content);
+    return true;
+  } catch (err) {
+    log.error('IPC', 'project:save-silent_error', { error: err.message });
+    return false;
+  }
 });
 
 ipcMain.handle('dialog:save-as', async (_, data) => {
@@ -249,15 +269,28 @@ ipcMain.handle('ai:generate', async (_, { apiHost, apiKey, model, systemPrompt, 
   const url = `${baseUrl}/chat/completions`;
   log.debug('IPC', 'ai:generate_url', { url });
   
-  const body = JSON.stringify({
+  const body = {
     model,
     messages: [
       { role: 'system', content: systemPrompt },
       { role: 'user', content: userPrompt },
     ],
     temperature: 0.7,
-    max_tokens: 2000,
-  });
+    max_tokens: 4000,
+  };
+
+  // Enable OpenRouter web search plugin so the AI can pull up-to-date references
+  // from the internet — even when using free models.
+  if (baseUrl.includes('openrouter.ai')) {
+    body.plugins = [
+      {
+        id: 'web',
+        max_results: 5,
+        search_prompt: 'Gunakan hasil pencarian web berikut sebagai sumber referensi untuk menyusun jawaban. Jika mengutip, sebutkan sumbernya.',
+      },
+    ];
+    log.debug('IPC', 'ai:generate_web_search_enabled');
+  }
 
   try {
     const response = await fetch(url, {
@@ -266,7 +299,7 @@ ipcMain.handle('ai:generate', async (_, { apiHost, apiKey, model, systemPrompt, 
         'Content-Type': 'application/json',
         'Authorization': `Bearer ${apiKey}`,
       },
-      body,
+      body: JSON.stringify(body),
     });
 
     const text = await response.text();

@@ -5,6 +5,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
   openProject: (filePath) => ipcRenderer.invoke('project:load', filePath),
   saveFile: (data) => ipcRenderer.invoke('dialog:save', data),
   saveFileAs: (data) => ipcRenderer.invoke('dialog:save-as', data),
+  saveProjectSilent: (filePath, content) => ipcRenderer.invoke('project:save-silent', filePath, content),
   exportFile: (options) => ipcRenderer.invoke('dialog:export', options),
   getRecent: () => ipcRenderer.invoke('recent:get'),
   addRecent: (filePath) => ipcRenderer.invoke('recent:add', filePath),

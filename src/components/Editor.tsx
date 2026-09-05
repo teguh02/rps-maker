@@ -3,8 +3,10 @@ import type { Project } from '../App'
 import { Ribbon } from './Ribbon'
 import { RTE } from './RTE'
 import { guideSections } from './GuidePage'
+import { ArrowUpIcon, ArrowDownIcon, TrashIcon } from './icons'
 import { isAIConfigured, generateWithAI, getSectionPrompt } from '../services/ai'
 import { logger } from '../utils/logger'
+import { stripHtml } from '../utils/html'
 
 interface EditorProps {
   project: Project
@@ -14,6 +16,8 @@ interface EditorProps {
   onOpenAISettings?: () => void
   onGoHome?: () => void
   onOpenGuide?: (section: string) => void
+  autoSaveActive?: boolean
+  lastAutoSaveAt?: string | null
 }
 
 interface PenilaianItem {
@@ -32,12 +36,10 @@ interface PertemuanItem {
   no: number
   subCpmk: string
   indikator: string
-  kriteria: string
-  bentuk: string
-  metodeOffline: string
-  metodeOnline: string
-  penugasan: string
-  estimasiWaktu: string
+  kriteriaTeknik: string
+  bentukMetodePenugasan: string
+  luring: string
+  daring: string
   materiPustaka: string
   bobot: number
   type?: 'regular'
@@ -52,7 +54,7 @@ interface PertemuanSpecial {
 
 type PertemuanRow = PertemuanItem | PertemuanSpecial
 
-export function Editor({ project, onUpdate, onSave, onExport, onOpenAISettings, onGoHome, onOpenGuide }: EditorProps) {
+export function Editor({ project, onUpdate, onSave, onExport, onOpenAISettings, onGoHome, onOpenGuide, autoSaveActive, lastAutoSaveAt }: EditorProps) {
   const [activeSection, setActiveSection] = useState('identitas')
   const [aiLoading, setAiLoading] = useState(false)
   const [aiError, setAiError] = useState('')
@@ -85,7 +87,7 @@ export function Editor({ project, onUpdate, onSave, onExport, onOpenAISettings, 
     }
     try {
       await navigator.clipboard.writeText(selectedText);
-      selection.removeAllRanges();
+      selection?.removeAllRanges();
       showToast('Teks berhasil dipotong ke clipboard.', 'info')
     } catch (err) {
       showToast('Gagal memotong teks. Periksa izin clipboard browser.', 'error')
@@ -116,7 +118,7 @@ export function Editor({ project, onUpdate, onSave, onExport, onOpenAISettings, 
       }
       const activeElement = document.activeElement;
       if (activeElement && typeof (activeElement as HTMLElement).insertAdjacentText === 'function') {
-        (activeElement as HTMLElement).insertAdjacentText('end', text);
+        (activeElement as HTMLElement).insertAdjacentText('beforeend', text);
         showToast('Teks berhasil ditempel.', 'info')
       } else {
         showToast('Tidak ada area input aktif. Klik pada kolom input terlebih dahulu.', 'warning')
@@ -229,12 +231,10 @@ export function Editor({ project, onUpdate, onSave, onExport, onOpenAISettings, 
         no: i,
         subCpmk,
         indikator: existingItem?.indikator || '',
-        kriteria: existingItem?.kriteria || '',
-        bentuk: existingItem?.bentuk || '',
-        metodeOffline: existingItem?.metodeOffline || '',
-        metodeOnline: existingItem?.metodeOnline || '',
-        penugasan: existingItem?.penugasan || '',
-        estimasiWaktu: existingItem?.estimasiWaktu || '',
+        kriteriaTeknik: existingItem?.kriteriaTeknik || '',
+        bentukMetodePenugasan: existingItem?.bentukMetodePenugasan || '',
+        luring: existingItem?.luring || '',
+        daring: existingItem?.daring || '',
         materiPustaka: existingItem?.materiPustaka || '',
         bobot: existingItem?.bobot || 0,
       })
@@ -246,8 +246,42 @@ export function Editor({ project, onUpdate, onSave, onExport, onOpenAISettings, 
   }
 
   const getSubCpmkList = (): string[] => {
-    return getStructuredList('sub_cpmk').map(s => s.deskripsi)
+    return getStructuredList('sub_cpmk').map(s => stripHtml(s.deskripsi))
   }
+
+  const RowActions = ({ idx, total, onMoveUp, onMoveDown, onDelete }: {
+    idx: number
+    total: number
+    onMoveUp: () => void
+    onMoveDown: () => void
+    onDelete: () => void
+  }) => (
+    <div className="flex items-center justify-center gap-1">
+      <button
+        onClick={onMoveUp}
+        disabled={idx === 0}
+        className="row-action-btn"
+        title="Pindah ke atas"
+      >
+        <ArrowUpIcon size={16} />
+      </button>
+      <button
+        onClick={onMoveDown}
+        disabled={idx === total - 1}
+        className="row-action-btn"
+        title="Pindah ke bawah"
+      >
+        <ArrowDownIcon size={16} />
+      </button>
+      <button
+        onClick={onDelete}
+        className="row-action-btn row-action-btn-delete"
+        title="Hapus baris"
+      >
+        <TrashIcon size={16} />
+      </button>
+    </div>
+  )
 
   const StructuredList = ({
     listKey,
@@ -287,6 +321,16 @@ export function Editor({ project, onUpdate, onSave, onExport, onOpenAISettings, 
       onChange(newItems)
     }
 
+    const moveItem = (fromIdx: number, direction: 'up' | 'down') => {
+      const toIdx = direction === 'up' ? fromIdx - 1 : fromIdx + 1
+      if (toIdx < 0 || toIdx >= items.length) return
+      const newItems = [...items]
+      const [moved] = newItems.splice(fromIdx, 1)
+      newItems.splice(toIdx, 0, moved)
+      logger.debug('EDITOR', 'editor.structured_list.move', { listKey, from: fromIdx, to: toIdx })
+      onChange(newItems)
+    }
+
     const updateDeskripsi = (idx: number, deskripsi: string) => {
       const newItems = [...items]
       newItems[idx] = { ...newItems[idx], deskripsi }
@@ -310,15 +354,24 @@ export function Editor({ project, onUpdate, onSave, onExport, onOpenAISettings, 
         <table className="w-full">
           <thead>
             <tr className="bg-gray-50">
+              <th className="text-left text-sm font-medium text-gray-700 p-2 w-32"></th>
               <th className="text-left text-sm font-medium text-gray-700 p-2 w-28">Label</th>
               {showJudul && <th className="text-left text-sm font-medium text-gray-700 p-2 w-48">Judul</th>}
               <th className="text-left text-sm font-medium text-gray-700 p-2">Deskripsi</th>
-              <th className="text-left text-sm font-medium text-gray-700 p-2 w-16">Aksi</th>
             </tr>
           </thead>
           <tbody>
             {items.map((item, idx) => (
-              <tr key={idx} className="border-t">
+              <tr key={idx} className="border-t hover:bg-gray-50">
+                <td className="p-2">
+                  <RowActions
+                    idx={idx}
+                    total={items.length}
+                    onMoveUp={() => moveItem(idx, 'up')}
+                    onMoveDown={() => moveItem(idx, 'down')}
+                    onDelete={() => removeItem(idx)}
+                  />
+                </td>
                 <td className="p-2">
                   <input
                     type="text"
@@ -340,22 +393,12 @@ export function Editor({ project, onUpdate, onSave, onExport, onOpenAISettings, 
                   </td>
                 )}
                 <td className="p-2">
-                  <textarea
-                    value={item.deskripsi}
-                    onChange={(e) => updateDeskripsi(idx, e.target.value)}
+                  <RTE
+                    content={item.deskripsi}
+                    onUpdate={(html) => updateDeskripsi(idx, html)}
                     placeholder={`Deskripsi ${item.label || prefix}${idx + 1}...`}
-                    className="w-full px-2 py-1 text-sm border border-transparent hover:border-gray-300 focus:border-blue-500 focus:outline-none rounded resize-none"
-                    rows={2}
+                    compact
                   />
-                </td>
-                <td className="p-2">
-                  <button
-                    onClick={() => removeItem(idx)}
-                    className="text-red-500 hover:text-red-700 text-sm"
-                    title="Hapus"
-                  >
-                    Hapus
-                  </button>
                 </td>
               </tr>
             ))}
@@ -721,7 +764,7 @@ export function Editor({ project, onUpdate, onSave, onExport, onOpenAISettings, 
                       <th className="text-left text-sm font-medium text-gray-700 p-2">No</th>
                       <th className="text-left text-sm font-medium text-gray-700 p-2">Komponen Penilaian</th>
                       <th className="text-left text-sm font-medium text-gray-700 p-2 w-24">Bobot (%)</th>
-                      <th className="text-left text-sm font-medium text-gray-700 p-2 w-16">Aksi</th>
+                      <th className="text-left text-sm font-medium text-gray-700 p-2 w-32"></th>
                     </tr>
                   </thead>
                   <tbody>
@@ -755,16 +798,31 @@ export function Editor({ project, onUpdate, onSave, onExport, onOpenAISettings, 
                           />
                         </td>
                         <td className="p-2">
-                          <button
-                            onClick={() => {
+                          <RowActions
+                            idx={idx}
+                            total={getPenilaian().length}
+                            onMoveUp={() => {
+                              if (idx === 0) return
+                              const items = [...getPenilaian()]
+                              const [moved] = items.splice(idx, 1)
+                              items.splice(idx - 1, 0, moved)
+                              logger.debug('EDITOR', 'editor.penilaian.move', { from: idx, to: idx - 1 })
+                              updatePenilaian(items)
+                            }}
+                            onMoveDown={() => {
+                              const items = [...getPenilaian()]
+                              if (idx >= items.length - 1) return
+                              const [moved] = items.splice(idx, 1)
+                              items.splice(idx + 1, 0, moved)
+                              logger.debug('EDITOR', 'editor.penilaian.move', { from: idx, to: idx + 1 })
+                              updatePenilaian(items)
+                            }}
+                            onDelete={() => {
                               const items = getPenilaian().filter((_, i) => i !== idx)
                               logger.debug('EDITOR', 'editor.penilaian.remove', { index: idx, remaining: items.length })
                               updatePenilaian(items)
                             }}
-                            className="text-red-500 hover:text-red-700 text-sm"
-                          >
-                            Hapus
-                          </button>
+                          />
                         </td>
                       </tr>
                     ))}
@@ -816,127 +874,103 @@ export function Editor({ project, onUpdate, onSave, onExport, onOpenAISettings, 
                   Generate dari Sub-CPMK
                 </button>
               </div>
-              <div className="overflow-x-auto">
-                <table className="w-full text-sm" style={{ minWidth: '1600px' }}>
-                  <thead>
-                    <tr className="bg-gray-100">
-                      <th className="border p-2 w-10">No</th>
-                      <th className="border p-2 w-40">Kemampuan Akhir</th>
-                      <th className="border p-2 w-36">Indikator</th>
-                      <th className="border p-2 w-36">Kriteria</th>
-                      <th className="border p-2 w-28">Bentuk</th>
-                      <th className="border p-2 w-28">Luring</th>
-                      <th className="border p-2 w-28">Daring</th>
-                      <th className="border p-2 w-32">Penugasan</th>
-                      <th className="border p-2 w-20">Waktu</th>
-                      <th className="border p-2 w-40">Materi</th>
-                      <th className="border p-2 w-16">Bobot</th>
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm" style={{ minWidth: '1600px' }}>
+              <thead>
+                <tr className="bg-gray-100">
+                  <th rowSpan={2} className="border p-2 w-10">No</th>
+                  <th colSpan={2} rowSpan={2} className="border p-2 w-40">Kemampuan Akhir (Sub-CPMK)</th>
+                  <th colSpan={6} className="border p-2 w-72">Penilaian</th>
+                  <th colSpan={4} className="border p-2 w-56">Bentuk Pembelajaran, Metode Pembelajaran, Penugasan Mahasiswa, [Estimasi Waktu]</th>
+                  <th colSpan={2} rowSpan={2} className="border p-2 w-40">Materi [Pustaka]</th>
+                  <th rowSpan={2} className="border p-2 w-16">Bobot</th>
+                </tr>
+                <tr className="bg-gray-100">
+                  <th colSpan={2} className="border p-2">Indikator</th>
+                  <th colSpan={4} className="border p-2">Kriteria & Teknik</th>
+                  <th className="border p-2">Luring</th>
+                  <th colSpan={3} className="border p-2">Daring</th>
+                </tr>
+              </thead>
+              <tbody>
+                {getPertemuan().map((row, idx) => {
+                  if (row.type === 'uts' || row.type === 'uas') {
+                    return (
+                      <tr key={idx} className="bg-gray-50">
+                        <td className="border p-2 text-center text-gray-500" colSpan={14}>
+                          <strong>{row.label}</strong>
+                        </td>
+                      </tr>
+                    )
+                  }
+                  const item = row as PertemuanItem
+                  return (
+                    <tr key={idx}>
+                      <td className="border p-1 text-center text-gray-500">{item.no}</td>
+                      <td colSpan={2} className="border p-1">
+                        <RTE
+                          content={item.subCpmk}
+                          onUpdate={(html) => updatePertemuanField(idx, 'subCpmk', html)}
+                          placeholder={`Sub-CPMK pertemuan ${item.no}`}
+                          compact
+                        />
+                      </td>
+                      <td colSpan={2} className="border p-1">
+                        <RTE
+                          content={item.indikator}
+                          onUpdate={(html) => updatePertemuanField(idx, 'indikator', html)}
+                          placeholder="Indikator"
+                          compact
+                        />
+                      </td>
+                      <td colSpan={4} className="border p-1">
+                        <RTE
+                          content={item.kriteriaTeknik}
+                          onUpdate={(html) => updatePertemuanField(idx, 'kriteriaTeknik', html)}
+                          placeholder="Kriteria & Teknik"
+                          compact
+                        />
+                      </td>
+                      <td className="border p-1">
+                        <RTE
+                          content={item.bentukMetodePenugasan}
+                          onUpdate={(html) => updatePertemuanField(idx, 'bentukMetodePenugasan', html)}
+                          placeholder="Bentuk/Metode/Penugasan"
+                          compact
+                        />
+                      </td>
+                      <td colSpan={3} className="border p-1">
+                        <RTE
+                          content={item.daring}
+                          onUpdate={(html) => updatePertemuanField(idx, 'daring', html)}
+                          placeholder="Daring"
+                          compact
+                        />
+                      </td>
+                      <td colSpan={2} className="border p-1">
+                        <RTE
+                          content={item.materiPustaka}
+                          onUpdate={(html) => updatePertemuanField(idx, 'materiPustaka', html)}
+                          placeholder="Materi [Pustaka]"
+                          compact
+                        />
+                      </td>
+                      <td className="border p-1">
+                        <input
+                          type="number"
+                          value={item.bobot}
+                          onChange={(e) => updatePertemuanField(idx, 'bobot', parseInt(e.target.value) || 0)}
+                          className="w-full px-1 py-0.5 text-xs border-0 focus:outline-none text-center"
+                          min="0"
+                          max="100"
+                        />
+                      </td>
                     </tr>
-                  </thead>
-                  <tbody>
-                    {getPertemuan().map((row, idx) => {
-                      if (row.type === 'uts' || row.type === 'uas') {
-                        return (
-                          <tr key={idx} className="bg-gray-50">
-                            <td className="border p-2 text-center text-gray-500" colSpan={11}>
-                              <strong>{row.label}</strong>
-                            </td>
-                          </tr>
-                        )
-                      }
-                      const item = row as PertemuanItem
-                      return (
-                        <tr key={idx}>
-                          <td className="border p-1 text-center text-gray-500">{item.no}</td>
-                          <td className="border p-1">
-                            <textarea
-                              value={item.subCpmk}
-                              onChange={(e) => updatePertemuanField(idx, 'subCpmk', e.target.value)}
-                              className="w-full px-1 py-0.5 text-xs border-0 focus:outline-none resize-none"
-                              rows={2}
-                            />
-                          </td>
-                          <td className="border p-1">
-                            <textarea
-                              value={item.indikator}
-                              onChange={(e) => updatePertemuanField(idx, 'indikator', e.target.value)}
-                              className="w-full px-1 py-0.5 text-xs border-0 focus:outline-none resize-none"
-                              rows={2}
-                            />
-                          </td>
-                          <td className="border p-1">
-                            <textarea
-                              value={item.kriteria}
-                              onChange={(e) => updatePertemuanField(idx, 'kriteria', e.target.value)}
-                              className="w-full px-1 py-0.5 text-xs border-0 focus:outline-none resize-none"
-                              rows={2}
-                            />
-                          </td>
-                          <td className="border p-1">
-                            <textarea
-                              value={item.bentuk}
-                              onChange={(e) => updatePertemuanField(idx, 'bentuk', e.target.value)}
-                              className="w-full px-1 py-0.5 text-xs border-0 focus:outline-none resize-none"
-                              rows={2}
-                            />
-                          </td>
-                          <td className="border p-1">
-                            <textarea
-                              value={item.metodeOffline}
-                              onChange={(e) => updatePertemuanField(idx, 'metodeOffline', e.target.value)}
-                              className="w-full px-1 py-0.5 text-xs border-0 focus:outline-none resize-none"
-                              rows={2}
-                            />
-                          </td>
-                          <td className="border p-1">
-                            <textarea
-                              value={item.metodeOnline}
-                              onChange={(e) => updatePertemuanField(idx, 'metodeOnline', e.target.value)}
-                              className="w-full px-1 py-0.5 text-xs border-0 focus:outline-none resize-none"
-                              rows={2}
-                            />
-                          </td>
-                          <td className="border p-1">
-                            <textarea
-                              value={item.penugasan}
-                              onChange={(e) => updatePertemuanField(idx, 'penugasan', e.target.value)}
-                              className="w-full px-1 py-0.5 text-xs border-0 focus:outline-none resize-none"
-                              rows={2}
-                            />
-                          </td>
-                          <td className="border p-1">
-                            <input
-                              type="text"
-                              value={item.estimasiWaktu}
-                              onChange={(e) => updatePertemuanField(idx, 'estimasiWaktu', e.target.value)}
-                              className="w-full px-1 py-0.5 text-xs border-0 focus:outline-none"
-                              placeholder="2x50'"
-                            />
-                          </td>
-                          <td className="border p-1">
-                            <textarea
-                              value={item.materiPustaka}
-                              onChange={(e) => updatePertemuanField(idx, 'materiPustaka', e.target.value)}
-                              className="w-full px-1 py-0.5 text-xs border-0 focus:outline-none resize-none"
-                              rows={2}
-                            />
-                          </td>
-                          <td className="border p-1">
-                            <input
-                              type="number"
-                              value={item.bobot}
-                              onChange={(e) => updatePertemuanField(idx, 'bobot', parseInt(e.target.value) || 0)}
-                              className="w-full px-1 py-0.5 text-xs border-0 focus:outline-none text-center"
-                              min="0"
-                              max="100"
-                            />
-                          </td>
-                        </tr>
-                      )
-                    })}
-                  </tbody>
-                </table>
-              </div>
+                  )
+                })}
+              </tbody>
+            </table>
+          </div>
             </section>
           )}
 
@@ -1011,6 +1045,11 @@ export function Editor({ project, onUpdate, onSave, onExport, onOpenAISettings, 
             {section.label}
           </button>
         ))}
+        {autoSaveActive && (
+          <span className="autosave-indicator" title={`Tersimpan otomatis terakhir: ${lastAutoSaveAt || '-'}`}>
+            <span className="autosave-dot" /> Auto-save aktif{lastAutoSaveAt ? ` · ${lastAutoSaveAt}` : ''}
+          </span>
+        )}
       </div>
 
       {/* Context menu */}

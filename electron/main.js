@@ -318,7 +318,7 @@ ipcMain.handle('pdf:export-html', async (event, filePath, html) => {
     log.debug('IPC', 'pdf:export-html_loaded');
     // Wait a bit for rendering to complete
     await new Promise(r => setTimeout(r, 1000));
-    pdfBuffer = await tmpWin.printToPDF({ landscape: true, preferCSSPageSize: true });
+    pdfBuffer = await tmpWin.webContents.printToPDF({ landscape: true, preferCSSPageSize: true });
     log.debug('IPC', 'pdf:export-html_printed', { bytes: pdfBuffer.byteLength });
   } catch (e) {
     log.error('IPC', 'pdf:export-html_print_failed', { error: e instanceof Error ? e.message : String(e) });

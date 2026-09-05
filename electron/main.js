@@ -294,34 +294,38 @@ ipcMain.handle('pdf:export-html', async (event, filePath, html) => {
   if (!lower.endsWith('.pdf')) {
     const idx = lower.lastIndexOf('.');
     finalPath = idx >= 0 ? filePath.substring(0, idx) + '.pdf' : filePath + '.pdf';
-    log.debug('IPC', 'pdf:export-html_renamed_ext', { filePath: finalPath });
   }
+
+  // Write to a simple temp file
+  const tmpHtml = path.join(app.getPath('temp'), 'rps-export.html');
+  fs.writeFileSync(tmpHtml, html, 'utf-8');
+  log.debug('IPC', 'pdf:export-html_written', { tmpHtml, size: html.length });
 
   let pdfBuffer;
   const tmpWin = new BrowserWindow({
     width: 1200, height: 900, show: false,
-    webPreferences: {
-      webSecurity: false,
-      nodeIntegration: false,
-      contextIsolation: true,
-    },
+    webPreferences: { webSecurity: false },
   });
   try {
-    // Encode HTML as data URI to avoid file path issues
-    const dataUri = 'data:text/html;charset=utf-8,' + encodeURIComponent(html);
+    const fileUrl = 'file://' + tmpHtml.replace(/\\/g, '/');
+    log.debug('IPC', 'pdf:export-html_loading', { fileUrl });
     await new Promise((resolve, reject) => {
-      tmpWin.once('did-finish-load', resolve);
-      tmpWin.once('did-fail-load', (_e, code, desc) => reject(new Error(`load-failed ${code}: ${desc}`)));
-      tmpWin.loadURL(dataUri);
-      setTimeout(() => reject(new Error('load-timeout')), 30000);
+      const timer = setTimeout(() => reject(new Error('load-timeout')), 30000);
+      tmpWin.webContents.once('did-finish-load', () => { clearTimeout(timer); resolve(); });
+      tmpWin.webContents.once('did-fail-load', (_e, code, desc) => { clearTimeout(timer); reject(new Error(`fail ${code}: ${desc}`)); });
+      tmpWin.loadURL(fileUrl);
     });
     log.debug('IPC', 'pdf:export-html_loaded');
+    // Wait a bit for rendering to complete
+    await new Promise(r => setTimeout(r, 1000));
     pdfBuffer = await tmpWin.printToPDF({ landscape: true, preferCSSPageSize: true });
+    log.debug('IPC', 'pdf:export-html_printed', { bytes: pdfBuffer.byteLength });
   } catch (e) {
     log.error('IPC', 'pdf:export-html_print_failed', { error: e instanceof Error ? e.message : String(e) });
     throw e;
   } finally {
     tmpWin.destroy();
+    try { fs.unlinkSync(tmpHtml); } catch {}
   }
 
   fs.writeFileSync(finalPath, pdfBuffer);

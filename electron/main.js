@@ -1,6 +1,8 @@
-const { app, BrowserWindow, ipcMain, dialog, nativeImage, Menu } = require('electron');
+const { app, BrowserWindow, ipcMain, dialog, nativeImage, Menu, shell } = require('electron');
 const path = require('path');
 const fs = require('fs');
+const https = require('https');
+const { spawn } = require('child_process');
 const JSZip = require('jszip');
 
 // Simple logger for main process
@@ -418,6 +420,198 @@ function sendToRenderer(event, ...args) {
     mainWindow.webContents.send(event, ...args);
   }
 }
+
+/* ─────────────────────────────────────────────────────────────
+ * In-app update checker (GitHub Releases)
+ * ─────────────────────────────────────────────────────────────
+ * Releases are created by .github/workflows/build-release.yml on
+ * branch `build`. The repo is public, so no token is needed for
+ * the GitHub API. Version on GitHub must match package.json (the
+ * release pipeline bumps it before building).
+ */
+const UPDATE_SOURCE = { owner: 'teguh02', repo: 'rps-maker' };
+const UPDATE_CACHE_TTL_MS = 60 * 1000;
+let updateCache = { at: 0, result: null };
+
+function parseVersion(v) {
+  const m = String(v).replace(/^v/i, '').match(/(\d+)\.(\d+)\.(\d+)/);
+  return m ? m.slice(1).map((n) => parseInt(n, 10)) : null;
+}
+
+function isNewer(a, b) {
+  const pa = parseVersion(a);
+  const pb = parseVersion(b);
+  if (!pa || !pb) return false;
+  for (let i = 0; i < 3; i++) {
+    if (pa[i] !== pb[i]) return pa[i] > pb[i];
+  }
+  return false;
+}
+
+function githubGetJson(url) {
+  return new Promise((resolve, reject) => {
+    const req = https.get(url, {
+      headers: {
+        'User-Agent': 'RPS-Maker-UNISINA',
+        Accept: 'application/vnd.github+json',
+        'X-GitHub-Api-Version': '2022-11-28',
+      },
+    }, (res) => {
+      let body = '';
+      res.on('data', (chunk) => { body += chunk; });
+      res.on('end', () => {
+        if (res.statusCode !== 200) {
+          return reject(new Error(`GitHub API HTTP ${res.statusCode}`));
+        }
+        try {
+          resolve(JSON.parse(body));
+        } catch (err) {
+          reject(err);
+        }
+      });
+    });
+    req.on('error', reject);
+  });
+}
+
+async function checkForUpdates(force) {
+  if (!force && updateCache.result && Date.now() - updateCache.at < UPDATE_CACHE_TTL_MS) {
+    return updateCache.result;
+  }
+  try {
+    const url = `https://api.github.com/repos/${UPDATE_SOURCE.owner}/${UPDATE_SOURCE.repo}/releases/latest`;
+    const release = await githubGetJson(url);
+    const current = app.getVersion();
+    const remote = String(release.tag_name || '').replace(/^v/i, '');
+    const result = {
+      status: isNewer(remote, current) ? 'update-available' : 'up-to-date',
+      currentVersion: current,
+      version: remote || '',
+      tag: release.tag_name || '',
+      notes: release.body || '',
+      url: release.html_url || '',
+      publishedAt: release.published_at || '',
+      assets: (release.assets || []).map((a) => ({ name: a.name, url: a.browser_download_url, size: a.size || 0 })),
+    };
+    updateCache = { at: Date.now(), result };
+    log.info('UPDATER', 'check_done', { current, remote, status: result.status });
+    return result;
+  } catch (err) {
+    log.error('UPDATER', 'check_error', { error: err.message });
+    return { status: 'error', currentVersion: app.getVersion(), error: err.message };
+  }
+}
+
+// Pick the installer asset for the current platform (Windows → .exe, macOS → .dmg).
+function pickInstallerAsset(assets) {
+  if (!assets || !assets.length) return null;
+  const isWin = process.platform === 'win32';
+  const isMac = process.platform === 'darwin';
+  const pool = assets.filter((a) =>
+    isWin ? /\.exe$/i.test(a.name) : isMac ? /\.dmg$/i.test(a.name) : false
+  );
+  if (!pool.length) return null;
+  pool.sort((a, b) => (b.size || 0) - (a.size || 0));
+  return pool[0];
+}
+
+// Stream a release asset to disk, following redirects and reporting progress.
+function downloadFile(url, destPath, onProgress) {
+  return new Promise((resolve, reject) => {
+    const doGet = (currentUrl, hops) => {
+      if (hops > 5) return reject(new Error('Terlalu banyak redirect'));
+      const req = https.get(currentUrl, { headers: { 'User-Agent': 'RPS-Maker-UNISINA' } }, (res) => {
+        if (res.statusCode >= 300 && res.statusCode < 400 && res.headers.location) {
+          res.resume();
+          return doGet(res.headers.location, hops + 1);
+        }
+        if (res.statusCode !== 200) {
+          res.resume();
+          return reject(new Error(`Download HTTP ${res.statusCode}`));
+        }
+        const total = parseInt(res.headers['content-length'] || '0', 10);
+        let received = 0;
+        const file = fs.createWriteStream(destPath);
+        file.on('error', (err) => { req.destroy(); reject(err); });
+        res.on('data', (chunk) => {
+          received += chunk.length;
+          if (onProgress && total > 0) onProgress(received, total);
+        });
+        res.pipe(file);
+        file.on('finish', () => file.close(() => {
+          if (onProgress) onProgress(received, total || received);
+          resolve(destPath);
+        }));
+      });
+      req.on('error', (err) => {
+        try { fs.unlinkSync(destPath); } catch (e) { /* ignore */ }
+        reject(err);
+      });
+    };
+    doGet(url, 0);
+  });
+}
+
+ipcMain.handle('updates:check', async (_, force) => {
+  return checkForUpdates(!!force);
+});
+
+// Download the newest installer and run it. In dev mode there is nothing to
+// install, so the release page is opened in the browser instead (useful to
+// test the banner flow).
+ipcMain.handle('updates:install', async () => {
+  const info = await checkForUpdates(true);
+  if (info.status !== 'update-available') {
+    return { ok: false, error: 'Tidak ada pembaruan yang tersedia.' };
+  }
+
+  if (!app.isPackaged) {
+    log.info('UPDATER', 'dev_mode_open_release', { url: info.url });
+    await shell.openExternal(info.url);
+    return { ok: true, dev: true };
+  }
+
+  const asset = pickInstallerAsset(info.assets);
+  if (!asset) {
+    return { ok: false, error: 'Installer untuk platform ini tidak ditemukan di rilis.' };
+  }
+
+  const ext = process.platform === 'win32' ? '.exe' : '.dmg';
+  const destPath = path.join(app.getPath('temp'), `rps-maker-update-${Date.now()}${ext}`);
+  log.info('UPDATER', 'download_start', { name: asset.name, size: asset.size, dest: destPath });
+
+  try {
+    await downloadFile(asset.url, destPath, (received, total) => {
+      const percent = Math.min(100, Math.round((received / total) * 100));
+      sendToRenderer('updates:download-progress', { received, total, percent });
+    });
+    log.info('UPDATER', 'download_done', { dest: destPath });
+  } catch (err) {
+    log.error('UPDATER', 'download_error', { error: err.message });
+    try { fs.unlinkSync(destPath); } catch (e) { /* ignore */ }
+    return { ok: false, error: err.message };
+  }
+
+  if (process.platform === 'win32') {
+    // Launch the NSIS installer (silent one-click) detached, then close the app
+    // so the new version can be installed & started cleanly.
+    log.info('UPDATER', 'launch_installer', { dest: destPath });
+    const child = spawn(destPath, [], { detached: true, stdio: 'ignore' });
+    child.unref();
+    setTimeout(() => { app.quit(); }, 1500);
+    return { ok: true, action: 'quit' };
+  }
+
+  if (process.platform === 'darwin') {
+    // Open the DMG in Finder; the user drags the app to Applications.
+    log.info('UPDATER', 'open_dmg', { dest: destPath });
+    const err = await shell.openPath(destPath);
+    if (err) return { ok: false, error: err };
+    return { ok: true, action: 'opened' };
+  }
+
+  return { ok: false, error: `Platform ${process.platform} belum didukung auto-update.` };
+});
 
 function buildAppMenu() {
   const isMac = process.platform === 'darwin';

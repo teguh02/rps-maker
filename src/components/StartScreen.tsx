@@ -1,6 +1,6 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { prodiData, getPreloadedTemplate } from '../templates/curriculum-data'
-import { GraduationCapIcon, FileIcon, FolderOpenIcon, ClockIcon, PlusIcon, ChevronRightIcon } from './icons'
+import { GraduationCapIcon, FileIcon, FolderOpenIcon, ClockIcon, PlusIcon, ChevronRightIcon, DownloadIcon, XIcon } from './icons'
 
 // Real version from package.json — injected by Vite at build time (__APP_VERSION__).
 const APP_VERSION: string = typeof __APP_VERSION__ !== 'undefined' ? __APP_VERSION__ : ''
@@ -19,11 +19,76 @@ interface StartScreenProps {
   onClearRecent: () => void
 }
 
+type UpdateState =
+  | { phase: 'idle' }
+  | { phase: 'available'; version: string; notes: string; url: string }
+  | { phase: 'downloading'; percent: number; version: string }
+
+// Dismissed-version is remembered per version so the banner reappears
+// only when an even newer release shows up.
+const DISMISSED_KEY = 'rps-dismissed-update'
+
 export function StartScreen({ onNew, onOpen, recentFiles, onOpenRecent, onClearRecent }: StartScreenProps) {
   const [selectedProdi, setSelectedProdi] = useState('')
   const [selectedMK, setSelectedMK] = useState('')
+  const [update, setUpdate] = useState<UpdateState>({ phase: 'idle' })
+  const [updateError, setUpdateError] = useState('')
+
+  // Auto-detect a newer release from GitHub when the start screen opens.
+  useEffect(() => {
+    let cancelled = false
+    const unsubProgress = window.electronAPI.onUpdateProgress((data) => {
+      setUpdate(prev => (prev.phase === 'downloading' ? { ...prev, percent: data.percent } : prev))
+    })
+
+    window.electronAPI.checkForUpdates()
+      .then((res) => {
+        if (cancelled) return
+        if (res.status === 'update-available' && res.version && res.version !== res.currentVersion) {
+          try {
+            if (localStorage.getItem(DISMISSED_KEY) === res.version) return
+          } catch { /* ignore */ }
+          setUpdate({ phase: 'available', version: res.version, notes: res.notes || '', url: res.url || '' })
+        }
+      })
+      .catch(() => { /* update check is best-effort — never block the UI */ })
+
+    return () => {
+      cancelled = true
+      unsubProgress()
+    }
+  }, [])
 
   const selectedProdiData = prodiData.find(p => p.kode === selectedProdi)
+
+  const handleDismissUpdate = () => {
+    if (update.phase === 'available') {
+      try { localStorage.setItem(DISMISSED_KEY, update.version) } catch { /* ignore */ }
+    }
+    setUpdate({ phase: 'idle' })
+    setUpdateError('')
+  }
+
+  const handleInstallUpdate = async () => {
+    if (update.phase !== 'available') return
+    const { version, notes, url } = update
+    setUpdateError('')
+    setUpdate({ phase: 'downloading', percent: 0, version })
+    try {
+      const res = await window.electronAPI.installUpdate()
+      if (res.ok && res.dev) {
+        // Dev mode: halaman rilis sudah dibuka di browser — kembalikan banner.
+        setUpdate({ phase: 'available', version, notes, url })
+      } else if (!res.ok) {
+        setUpdate({ phase: 'available', version, notes, url })
+        setUpdateError(res.error || 'Gagal mengunduh update.')
+      }
+      // Packaged: sukses → app keluar & installer berjalan sendiri.
+    } catch {
+      setUpdate({ phase: 'available', version, notes, url })
+      setUpdateError('Gagal menghubungi server update.')
+    }
+  }
 
   const handleCreateNew = () => {
     if (selectedProdi && selectedMK) {
@@ -61,6 +126,60 @@ export function StartScreen({ onNew, onOpen, recentFiles, onOpenRecent, onClearR
       </header>
 
       <div className="ss-body">
+        {/* Update tersedia banner (auto-detect dari GitHub Releases) */}
+        {update.phase !== 'idle' && (
+          <div className="ss-update-zone">
+            <div className="ss-update-zone-inner">
+              {update.phase === 'available' && (
+                <div className="ss-update-banner" role="alert">
+                  <span className="ss-update-icon">
+                    <DownloadIcon size={18} />
+                  </span>
+                  <div className="ss-update-info">
+                    <p className="ss-update-title">
+                      Update tersedia — versi {update.version}
+                      <span className="ss-update-badge">BARU</span>
+                    </p>
+                    <p className="ss-update-desc">
+                      Versi terpasang: v{APP_VERSION || '—'}.{' '}
+                      {update.notes ? update.notes : 'Klik Update Sekarang untuk mengunduh dan memasang versi terbaru.'}
+                    </p>
+                    {updateError && <p className="ss-update-error">{updateError}</p>}
+                  </div>
+                  <div className="ss-update-actions">
+                    <button className="ss-update-btn" onClick={handleInstallUpdate}>
+                      <DownloadIcon size={15} />
+                      Update Sekarang
+                    </button>
+                    <button
+                      className="ss-update-close"
+                      onClick={handleDismissUpdate}
+                      title="Tutup — abaikan update ini"
+                      aria-label="Tutup pemberitahuan update"
+                    >
+                      <XIcon size={16} />
+                    </button>
+                  </div>
+                </div>
+              )}
+              {update.phase === 'downloading' && (
+                <div className="ss-update-banner ss-update-banner-downloading">
+                  <span className="ss-update-icon">
+                    <DownloadIcon size={18} />
+                  </span>
+                  <div className="ss-update-info">
+                    <p className="ss-update-title">Mengunduh update v{update.version}…</p>
+                    <div className="ss-update-progress-track">
+                      <div className="ss-update-progress-fill" style={{ width: `${update.percent}%` }} />
+                    </div>
+                  </div>
+                  <span className="ss-update-percent">{update.percent}%</span>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+
         <div className="ss-container">
           {/* Hero */}
           <div className="ss-hero">

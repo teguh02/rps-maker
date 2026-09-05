@@ -1,0 +1,174 @@
+# Build & Release untuk branch `build`
+#
+# Alur: branch `main` = development. Branch `build` DIPROTEKSI (PR-only):
+# tidak ada push langsung — setiap perubahan harus lewat PR (ruleset
+# "Protect build branch (PR-only)" di pengaturan repo). Saat PR dari `main`
+# ke `build` di-merge:
+#   1. Versi patch di package.json di-increment (vX.Y.Z) pada branch
+#      `release/vX.Y.Z`, lalu PR bump otomatis dibuat & langsung di-merge
+#      ke `build` via API (cara resmi GitHub — Actions tidak bisa push
+#      langsung ke branch terproteksi).
+#   2. Tag vX.Y.Z dibuat menunjuk ke HEAD `build` hasil merge bump.
+#   3. Installer Windows (EXE) & macOS (DMG) di-build dari kode hasil bump.
+#   4. GitHub Release vX.Y.Z dibuat — versi release == package.json.
+#
+# PR bump otomatis (head `release/vX`) yang di-merge TIDAK memicu rilis
+# lagi: job di bawah hanya berjalan bila head PR adalah `main`.
+#
+# Linux menyusul kemudian (sengaja belum disertakan).
+name: Build & Release (branch build)
+
+on:
+  pull_request:
+    types: [closed]
+    branches: [build]
+
+permissions:
+  contents: write
+  pull-requests: write
+
+concurrency:
+  group: rps-release-build
+  cancel-in-progress: false
+
+jobs:
+  bump-version:
+    name: Bump versi via PR otomatis
+    if: github.event.pull_request.merged == true && github.event.pull_request.base.ref == 'build' && github.event.pull_request.head.ref == 'main'
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.bump.outputs.version }}
+      tag: ${{ steps.bump.outputs.tag }}
+    steps:
+      - name: Checkout branch build
+        uses: actions/checkout@v4
+        with:
+          ref: build
+          fetch-depth: 0
+
+      - name: Configure git
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+      - name: Bump patch version, buka & merge PR ke build
+        id: bump
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          # Naikkan patch tanpa membuat tag lokal dulu — tag dibuat setelah
+          # PR ter-merge agar menunjuk ke commit yang benar-benar ada di build.
+          npm version patch --no-git-tag-version
+          NEW_VERSION="$(node -p "require('./package.json').version")"
+          echo "Versi baru: v${NEW_VERSION}"
+
+          BRANCH="release/v${NEW_VERSION}"
+          git checkout -b "$BRANCH"
+          git add package.json package-lock.json
+          git commit -m "chore(release): bump version to v${NEW_VERSION}"
+          git push origin "$BRANCH"
+
+          PR_URL="$(gh pr create --base build --head "$BRANCH" \
+            --title "chore(release): bump version to v${NEW_VERSION}" \
+            --body "Bump versi otomatis setelah PR \`main\` → \`build\` di-merge. Dibuat & digabungkan oleh workflow rilis.")"
+          echo "Bump PR: $PR_URL"
+
+          # Merge PR bump. Rule 'require pull request' terpenuhi karena
+          # perubahan masuk lewat PR; tanpa review wajib.
+          gh pr merge "$PR_URL" --squash --delete-branch
+
+          # Tag menunjuk ke HEAD build (commit hasil merge) — versi di
+          # GitHub Release, package.json, dan aplikasi selalu sama.
+          git fetch origin build
+          git tag "v${NEW_VERSION}" origin/build
+          git push origin "v${NEW_VERSION}"
+
+          echo "version=${NEW_VERSION}" >> "$GITHUB_OUTPUT"
+          echo "tag=v${NEW_VERSION}" >> "$GITHUB_OUTPUT"
+
+  build:
+    name: Build installer (${{ matrix.label }})
+    needs: bump-version
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - label: Windows
+            os: windows-latest
+            script: dist:win
+            artifact: rps-maker-win
+          - label: macOS
+            os: macos-latest
+            script: dist:mac
+            artifact: rps-maker-mac
+    env:
+      # Tanpa sertifikat signing: nonaktifkan auto-discovery (macOS wajib,
+      # kalau tidak electron-builder gagal mencari identitas signing).
+      CSC_IDENTITY_AUTO_DISCOVERY: "false"
+    steps:
+      - name: Checkout branch build
+        uses: actions/checkout@v4
+        with:
+          # Kode yang di-build sudah termasuk commit bump versi, sehingga
+          # versi di package.json (dipakai vite + electron-builder) = vX.Y.Z
+          ref: build
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build installer
+        run: npm run ${{ matrix.script }}
+
+      - name: Upload installer artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.artifact }}
+          if-no-files-found: error
+          path: |
+            release/*.exe
+            release/*.dmg
+            release/*.zip
+
+  release:
+    name: Publish GitHub Release
+    needs: [bump-version, build]
+    runs-on: ubuntu-latest
+    env:
+      GH_TOKEN: ${{ github.token }}
+      TAG: ${{ needs.bump-version.outputs.tag }}
+      VERSION: ${{ needs.bump-version.outputs.version }}
+      PR_TITLE: ${{ github.event.pull_request.title }}
+      PR_BODY: ${{ github.event.pull_request.body }}
+    steps:
+      - name: Download Windows installer
+        uses: actions/download-artifact@v4
+        with:
+          name: rps-maker-win
+          path: artifacts/win
+
+      - name: Download macOS installer
+        uses: actions/download-artifact@v4
+        with:
+          name: rps-maker-mac
+          path: artifacts/mac
+
+      - name: Create GitHub Release
+        run: |
+          # Catatan rilis: judul + deskripsi PR yang di-merge
+          printf '%s\n\n%s\n' "$PR_TITLE" "$PR_BODY" > notes.md
+
+          shopt -s nullglob
+          ASSETS=(artifacts/win/*.exe artifacts/mac/*.dmg artifacts/mac/*.zip)
+
+          echo "Membuat release $TAG (versi $VERSION) dengan ${#ASSETS[@]} aset..."
+          gh release create "$TAG" \
+            "${ASSETS[@]}" \
+            --title "RPS Maker UNISINA $VERSION" \
+            --notes-file notes.md

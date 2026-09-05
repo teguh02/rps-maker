@@ -6,6 +6,18 @@ declare global {
   /** Real app version from package.json, injected at build time by Vite. */
   const __APP_VERSION__: string
 
+  interface UpdateCheckResult {
+    status: 'update-available' | 'up-to-date' | 'error'
+    currentVersion: string
+    version?: string
+    tag?: string
+    notes?: string
+    url?: string
+    publishedAt?: string
+    error?: string
+    assets?: Array<{ name: string; url: string; size: number }>
+  }
+
   interface ElectronAPI {
     openFile: () => Promise<{ filePath: string; data: any } | null>
     openProject: (filePath: string) => Promise<{ filePath: string; data: any } | null>
@@ -27,6 +39,10 @@ declare global {
     onMenuExport: (callback: (format?: string) => void) => () => void
     onMenuImport: (callback: () => void) => () => void
     onOpenAISettings: (callback: () => void) => () => void
+
+    checkForUpdates: (force?: boolean) => Promise<UpdateCheckResult>
+    installUpdate: () => Promise<{ ok: boolean; dev?: boolean; action?: string; error?: string }>
+    onUpdateProgress: (callback: (data: { received: number; total: number; percent: number }) => void) => () => void
 
     platform: string
   }

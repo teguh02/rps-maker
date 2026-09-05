@@ -32,7 +32,7 @@ export function ShortcutsDialog({ open, onClose }: ShortcutsDialogProps) {
 
   return (
     <div className="dialog-backdrop" onClick={onClose}>
-      <div className="dialog-panel max-w-4xl" onClick={(e) => e.stopPropagation()}>
+      <div className="dialog-panel max-w-5xl" onClick={(e) => e.stopPropagation()}>
         <div className="dialog-header">
           <h2 className="text-lg font-bold">⌨️ Pintasan Keyboard</h2>
           <p className="text-sm text-gray-500 mt-1">

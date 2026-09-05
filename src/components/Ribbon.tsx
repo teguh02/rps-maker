@@ -3,10 +3,11 @@ import {
   HomeIcon, FileIcon, FolderOpenIcon, SaveIcon,
   ExportWordIcon, ExportPdfIcon, SparklesIcon, SettingsIcon,
   CopyIcon, CutIcon, PasteIcon, KeyboardIcon, InfoIcon,
-  UndoIcon, RedoIcon, ZoomInIcon, ZoomOutIcon, ZoomResetIcon,
+  UndoIcon, RedoIcon, ZoomInIcon, ZoomOutIcon, ZoomResetIcon, FullscreenIcon, ExitFullscreenIcon,
   BoldIcon, ItalicIcon, UnderlineIcon, StrikeIcon,
   BulletListIcon, NumberedListIcon, ClearFormatIcon,
   AlignLeftIcon, AlignCenterIcon, AlignRightIcon, AlignJustifyIcon,
+  PreviewIcon,
 } from './icons'
 import { editorRegistry } from '../services/editorRegistry'
 import { logger } from '../utils/logger'
@@ -26,6 +27,9 @@ interface RibbonProps {
   onZoomIn?: () => void
   onZoomOut?: () => void
   onZoomReset?: () => void
+  onPreview?: () => void
+  isFullscreen?: boolean
+  onToggleFullscreen?: () => void
   onShowShortcuts?: () => void
   activeSection?: string
   onGenerateAI?: () => void
@@ -62,7 +66,7 @@ const FONT_SIZES = ['8pt', '9pt', '10pt', '11pt', '12pt', '14pt', '16pt', '18pt'
 export function Ribbon({
   onSave, onExport, onOpenAISettings, onGoHome, activeSection, onGenerateAI, aiLoading,
   onCut, onCopy, onPaste, onUndo, onRedo, canUndo, canRedo,
-  onZoomIn, onZoomOut, onZoomReset, onShowShortcuts,
+  onZoomIn, onZoomOut, onZoomReset, onPreview, isFullscreen, onToggleFullscreen, onShowShortcuts,
 }: RibbonProps) {
   const [activeTab, setActiveTab] = useState<TabId>('home')
   const [showContent, setShowContent] = useState(true)
@@ -199,11 +203,24 @@ export function Ribbon({
         )}
 
         {activeTab === 'view' && (
-          <RibbonGroup label="Zoom">
-            <RibbonButton icon={<ZoomInIcon size={20} />} label="Zoom In" onClick={onZoomIn} />
-            <RibbonButton icon={<ZoomOutIcon size={20} />} label="Zoom Out" onClick={onZoomOut} />
-            <RibbonButton icon={<ZoomResetIcon size={20} />} label="Reset" onClick={onZoomReset} />
-          </RibbonGroup>
+          <>
+            <RibbonGroup label="Preview">
+              <RibbonButton icon={<PreviewIcon size={20} />} label="Preview" onClick={onPreview} />
+            </RibbonGroup>
+            <RibbonGroup label="Zoom">
+              <RibbonButton icon={<ZoomInIcon size={20} />} label="Zoom In" onClick={onZoomIn} />
+              <RibbonButton icon={<ZoomOutIcon size={20} />} label="Zoom Out" onClick={onZoomOut} />
+              <RibbonButton icon={<ZoomResetIcon size={20} />} label="Reset" onClick={onZoomReset} />
+            </RibbonGroup>
+            <RibbonGroup label="Window">
+              <RibbonButton
+                icon={isFullscreen ? <ExitFullscreenIcon size={20} /> : <FullscreenIcon size={20} />}
+                label={isFullscreen ? 'Exit Fullscreen' : 'Fullscreen'}
+                onClick={onToggleFullscreen}
+                active={isFullscreen}
+              />
+            </RibbonGroup>
+          </>
         )}
 
         {activeTab === 'help' && (

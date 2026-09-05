@@ -17,8 +17,10 @@ interface EditorProps {
   onOpenAISettings?: () => void
   onGoHome?: () => void
   onOpenGuide?: (section: string) => void
+  onPreview?: () => void
   autoSaveActive?: boolean
   lastAutoSaveAt?: string | null
+  showToast?: (message: string, type?: 'info' | 'warning' | 'error') => void
 }
 
 interface PenilaianItem {
@@ -55,7 +57,7 @@ interface PertemuanSpecial {
 
 type PertemuanRow = PertemuanItem | PertemuanSpecial
 
-export function Editor({ project, onUpdate, onSave, onExport, onOpenAISettings, onGoHome, onOpenGuide, autoSaveActive, lastAutoSaveAt }: EditorProps) {
+export function Editor({ project, onUpdate, onSave, onExport, onOpenAISettings, onGoHome, onOpenGuide, onPreview, autoSaveActive, lastAutoSaveAt, showToast }: EditorProps) {
   const [activeSection, setActiveSection] = useState('identitas')
   const [aiLoading, setAiLoading] = useState(false)
   const [aiError, setAiError] = useState('')
@@ -64,14 +66,16 @@ export function Editor({ project, onUpdate, onSave, onExport, onOpenAISettings, 
   const [undoStack, setUndoStack] = useState<string[]>([])
   const [redoStack, setRedoStack] = useState<string[]>([])
   const [currentContent, setCurrentContent] = useState<string>(JSON.stringify(project.content))
-  const [toast, setToast] = useState<{ message: string; type: 'info' | 'warning' | 'error' } | null>(null)
   const [contextMenu, setContextMenu] = useState<{ x: number; y: number } | null>(null)
   const [showShortcuts, setShowShortcuts] = useState(false)
+  const [isFullscreen, setIsFullscreen] = useState(true) // starts maximized
 
-  const showToast = (message: string, type: 'info' | 'warning' | 'error' = 'warning') => {
-    setToast({ message, type })
-    setTimeout(() => setToast(null), 3000)
+  const handleToggleFullscreen = async () => {
+    const result = await (window as any).electronAPI?.toggleFullscreen()
+    if (result !== undefined) setIsFullscreen(result)
   }
+
+  const safeToast = showToast || (() => {})
 
   const handleContextMenu = (e: React.MouseEvent) => {
     e.preventDefault()
@@ -84,15 +88,15 @@ export function Editor({ project, onUpdate, onSave, onExport, onOpenAISettings, 
     const selection = window.getSelection();
     const selectedText = selection?.toString().trim();
     if (!selectedText) {
-      showToast('Tidak ada teks yang dipilih. Blok teks terlebih dahulu sebelum Cut.', 'warning')
+      safeToast('Tidak ada teks yang dipilih. Blok teks terlebih dahulu sebelum Cut.', 'warning')
       return
     }
     try {
       await navigator.clipboard.writeText(selectedText);
       selection?.removeAllRanges();
-      showToast('Teks berhasil dipotong ke clipboard.', 'info')
+      safeToast('Teks berhasil dipotong ke clipboard.', 'info')
     } catch (err) {
-      showToast('Gagal memotong teks. Periksa izin clipboard browser.', 'error')
+      safeToast('Gagal memotong teks. Periksa izin clipboard browser.', 'error')
     }
   };
 
@@ -100,14 +104,14 @@ export function Editor({ project, onUpdate, onSave, onExport, onOpenAISettings, 
     const selection = window.getSelection();
     const selectedText = selection?.toString().trim();
     if (!selectedText) {
-      showToast('Tidak ada teks yang dipilih. Blok teks terlebih dahulu sebelum Copy.', 'warning')
+      safeToast('Tidak ada teks yang dipilih. Blok teks terlebih dahulu sebelum Copy.', 'warning')
       return
     }
     try {
       await navigator.clipboard.writeText(selectedText);
-      showToast('Teks berhasil disalin ke clipboard.', 'info')
+      safeToast('Teks berhasil disalin ke clipboard.', 'info')
     } catch (err) {
-      showToast('Gagal menyalin teks. Periksa izin clipboard browser.', 'error')
+      safeToast('Gagal menyalin teks. Periksa izin clipboard browser.', 'error')
     }
   };
 
@@ -115,38 +119,58 @@ export function Editor({ project, onUpdate, onSave, onExport, onOpenAISettings, 
     try {
       const text = await navigator.clipboard.readText();
       if (!text || !text.trim()) {
-        showToast('Clipboard kosong. Salin teks terlebih dahulu sebelum Paste.', 'warning')
+        safeToast('Clipboard kosong. Salin teks terlebih dahulu sebelum Paste.', 'warning')
         return
       }
       const activeElement = document.activeElement;
       if (activeElement && typeof (activeElement as HTMLElement).insertAdjacentText === 'function') {
         (activeElement as HTMLElement).insertAdjacentText('beforeend', text);
-        showToast('Teks berhasil ditempel.', 'info')
+        safeToast('Teks berhasil ditempel.', 'info')
       } else {
-        showToast('Tidak ada area input aktif. Klik pada kolom input terlebih dahulu.', 'warning')
+        safeToast('Tidak ada area input aktif. Klik pada kolom input terlebih dahulu.', 'warning')
       }
     } catch (err) {
-      showToast('Gagal menempel teks. Periksa izin clipboard browser.', 'error')
+      safeToast('Gagal menempel teks. Periksa izin clipboard browser.', 'error')
     }
   };
 
+  // Refs that always point at the LATEST render, so callbacks captured by older
+  // renders (e.g. TipTap's per-editor onUpdate, created once at mount) never
+  // write against a stale document snapshot and clobber other fields.
+  const onUpdateRef = useRef(onUpdate)
+  onUpdateRef.current = onUpdate
+  const currentContentRef = useRef(currentContent)
+  currentContentRef.current = currentContent
+
   const handleUndo = () => {
-    if (undoStack.length === 0) return;
+    if (undoStack.length === 0) { safeToast('Tidak ada yang bisa di-undo.', 'warning'); return; }
     const prev = undoStack[undoStack.length - 1];
     setUndoStack(undoStack.slice(0, -1));
     setRedoStack(prevState => [...prevState, currentContent]);
     setCurrentContent(prev);
-    onUpdate(JSON.parse(prev));
+    onUpdateRef.current(JSON.parse(prev));
   };
 
   const handleRedo = () => {
-    if (redoStack.length === 0) return;
+    if (redoStack.length === 0) { safeToast('Tidak ada yang bisa di-redo.', 'warning'); return; }
     const next = redoStack[redoStack.length - 1];
     setRedoStack(redoStack.slice(0, -1));
     setUndoStack(prev => [...prev, currentContent]);
     setCurrentContent(next);
-    onUpdate(JSON.parse(next));
+    onUpdateRef.current(JSON.parse(next));
   };
+
+  // Adopt external content changes (opened project, import dialog, …) into the
+  // local undo/redo snapshot so later edits build on top of them.
+  useEffect(() => {
+    const incoming = JSON.stringify(project.content)
+    if (incoming !== currentContentRef.current) {
+      setCurrentContent(incoming)
+      setUndoStack([])
+      setRedoStack([])
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [project.content])
 
   const handleZoomIn = () => {
     setZoom(z => Math.min(z + 0.25, 4));
@@ -239,15 +263,24 @@ export function Editor({ project, onUpdate, onSave, onExport, onOpenAISettings, 
 
   const updateField = (key: string, value: string) => {
     logger.debug('EDITOR', 'editor.field_update', { field: key })
-    const newState = { ...project.content, [key]: value }
+    // Build from the freshest snapshot (not a possibly-stale render closure),
+    // so edits from any RTE/input always merge onto the latest document.
+    let base: Record<string, string>
+    try {
+      base = JSON.parse(currentContentRef.current || '{}')
+    } catch {
+      base = { ...project.content }
+    }
+    const newState = { ...base, [key]: value }
     const newContent = JSON.stringify(newState)
-    
-    // Push to undo stack
-    setUndoStack(prev => [...prev, currentContent])
+
+    // Push to undo stack (cap at 50 states)
+    setUndoStack(prev => [...prev, currentContentRef.current].slice(-50))
     setRedoStack([])
-    
+
+    currentContentRef.current = newContent
     setCurrentContent(newContent)
-    onUpdate(newState)
+    onUpdateRef.current(newState)
   };
 
   const getStructuredList = (key: string): StructuredItem[] => {
@@ -295,6 +328,28 @@ export function Editor({ project, onUpdate, onSave, onExport, onOpenAISettings, 
     }
   }
 
+  // TipTap editors are created ONCE per cell, so their onUpdate closures point at
+  // an old render. Route every rich-text cell edit through these refs, which are
+  // re-pointed to the freshest functions on each render — guaranteeing edits
+  // always merge onto the CURRENT document/list, never a stale snapshot.
+  const listCellRef = useRef<(key: string, idx: number, value: string) => void>(() => {})
+  const pertCellRef = useRef<(idx: number, field: keyof PertemuanItem, value: string) => void>(() => {})
+  listCellRef.current = (key, idx, value) => {
+    const items = [...getStructuredList(key)]
+    const it = items[idx]
+    if (!it) return
+    items[idx] = { ...it, deskripsi: value }
+    updateField(key, JSON.stringify(items))
+  }
+  pertCellRef.current = (idx, field, value) => {
+    const items = [...getPertemuan()]
+    const row = items[idx]
+    if (row && row.type !== 'uts' && row.type !== 'uas') {
+      items[idx] = { ...row, [field]: value } as PertemuanItem
+      updateField('pertemuan', JSON.stringify(items))
+    }
+  }
+
   const generatePertemuan = () => {
     logger.info('EDITOR', 'editor.pertemuan.generate')
     const subCpmkList = getStructuredList('sub_cpmk')
@@ -328,12 +383,14 @@ export function Editor({ project, onUpdate, onSave, onExport, onOpenAISettings, 
     return getStructuredList('sub_cpmk').map(s => stripHtml(s.deskripsi))
   }
 
+  // Delete is optional: StructuredList tables render their own delete in the trailing
+  // "Aksi" column, while Penilaian passes onDelete to get ↑↓ + 🗑 in a single cell.
   const RowActions = ({ idx, total, onMoveUp, onMoveDown, onDelete }: {
     idx: number
     total: number
     onMoveUp: () => void
     onMoveDown: () => void
-    onDelete: () => void
+    onDelete?: () => void
   }) => (
     <div className="flex items-center justify-center gap-1">
       <button
@@ -352,13 +409,15 @@ export function Editor({ project, onUpdate, onSave, onExport, onOpenAISettings, 
       >
         <ArrowDownIcon size={16} />
       </button>
-      <button
-        onClick={onDelete}
-        className="row-action-btn row-action-btn-delete"
-        title="Hapus baris"
-      >
-        <TrashIcon size={16} />
-      </button>
+      {onDelete && (
+        <button
+          onClick={onDelete}
+          className="row-action-btn row-action-btn-delete"
+          title="Hapus baris"
+        >
+          <TrashIcon size={16} />
+        </button>
+      )}
     </div>
   )
 
@@ -367,6 +426,7 @@ export function Editor({ project, onUpdate, onSave, onExport, onOpenAISettings, 
     prefix,
     items,
     onChange,
+    onCellEdit,
     showCpmkRef = false,
     showJudul = true,
   }: {
@@ -374,6 +434,8 @@ export function Editor({ project, onUpdate, onSave, onExport, onOpenAISettings, 
     prefix: string
     items: StructuredItem[]
     onChange: (items: StructuredItem[]) => void
+    /** Rich-text cell edits — routed via a fresh ref so stale RTE closures never clobber other rows */
+    onCellEdit?: (idx: number, value: string) => void
     showCpmkRef?: boolean
     showJudul?: boolean
   }) => {
@@ -433,10 +495,11 @@ export function Editor({ project, onUpdate, onSave, onExport, onOpenAISettings, 
         <table className="w-full">
           <thead>
             <tr className="bg-gray-50">
-              <th className="text-left text-sm font-medium text-gray-700 p-2 w-32"></th>
+              <th className="text-left text-sm font-medium text-gray-700 p-2 w-12"></th>
               <th className="text-left text-sm font-medium text-gray-700 p-2 w-28">Label</th>
               {showJudul && <th className="text-left text-sm font-medium text-gray-700 p-2 w-48">Judul</th>}
               <th className="text-left text-sm font-medium text-gray-700 p-2">Deskripsi</th>
+              <th className="text-left text-sm font-medium text-gray-700 p-2 w-16">Aksi</th>
             </tr>
           </thead>
           <tbody>
@@ -448,7 +511,6 @@ export function Editor({ project, onUpdate, onSave, onExport, onOpenAISettings, 
                     total={items.length}
                     onMoveUp={() => moveItem(idx, 'up')}
                     onMoveDown={() => moveItem(idx, 'down')}
-                    onDelete={() => removeItem(idx)}
                   />
                 </td>
                 <td className="p-2">
@@ -474,10 +536,22 @@ export function Editor({ project, onUpdate, onSave, onExport, onOpenAISettings, 
                 <td className="p-2">
                   <RTE
                     content={item.deskripsi}
-                    onUpdate={(html) => updateDeskripsi(idx, html)}
+                    onUpdate={(html) => {
+                      if (onCellEdit) onCellEdit(idx, html)
+                      else updateDeskripsi(idx, html)
+                    }}
                     placeholder={`Deskripsi ${item.label || prefix}${idx + 1}...`}
                     compact
                   />
+                </td>
+                <td className="p-2">
+                  <button
+                    onClick={() => removeItem(idx)}
+                    className="row-action-btn row-action-btn-delete"
+                    title="Hapus baris"
+                  >
+                    <TrashIcon size={16} />
+                  </button>
                 </td>
               </tr>
             ))}
@@ -588,10 +662,12 @@ export function Editor({ project, onUpdate, onSave, onExport, onOpenAISettings, 
       
       const duration = ((Date.now() - startTime) / 1000).toFixed(1)
       logger.info('EDITOR', 'editor.ai_generate_end', { section, duration, success: true })
+      safeToast(`AI berhasil mengisi bagian ${section}.`, 'info')
     } catch (err) {
       const duration = ((Date.now() - startTime) / 1000).toFixed(1)
       logger.error('EDITOR', 'editor.ai_generate_error', { section, error: (err as Error).message, duration })
       setAiError((err as Error).message)
+      safeToast('Gagal generate AI: ' + (err as Error).message, 'error')
     } finally {
       setAiLoading(false)
     }
@@ -647,6 +723,9 @@ export function Editor({ project, onUpdate, onSave, onExport, onOpenAISettings, 
         onZoomIn={handleZoomIn}
         onZoomOut={handleZoomOut}
         onZoomReset={handleZoomReset}
+        onPreview={onPreview}
+        isFullscreen={isFullscreen}
+        onToggleFullscreen={handleToggleFullscreen}
         onShowShortcuts={() => setShowShortcuts(true)}
       />
 
@@ -766,6 +845,7 @@ export function Editor({ project, onUpdate, onSave, onExport, onOpenAISettings, 
                 prefix="CPL"
                 items={getStructuredList('cpl')}
                 onChange={(items) => updateStructuredList('cpl', items)}
+                onCellEdit={(idx, value) => listCellRef.current('cpl', idx, value)}
                 showJudul={false}
               />
             </section>
@@ -781,6 +861,7 @@ export function Editor({ project, onUpdate, onSave, onExport, onOpenAISettings, 
                 prefix="CPMK"
                 items={getStructuredList('cpmk')}
                 onChange={(items) => updateStructuredList('cpmk', items)}
+                onCellEdit={(idx, value) => listCellRef.current('cpmk', idx, value)}
                 showJudul={false}
               />
             </section>
@@ -795,6 +876,7 @@ export function Editor({ project, onUpdate, onSave, onExport, onOpenAISettings, 
                 prefix="Sub-CPMK"
                 items={getStructuredList('sub_cpmk')}
                 onChange={(items) => updateStructuredList('sub_cpmk', items)}
+                onCellEdit={(idx, value) => listCellRef.current('sub_cpmk', idx, value)}
                 showJudul={false}
               />
             </section>
@@ -822,6 +904,7 @@ export function Editor({ project, onUpdate, onSave, onExport, onOpenAISettings, 
                 prefix="Bahan Kajian"
                 items={getStructuredList('bahan_kajian')}
                 onChange={(items) => updateStructuredList('bahan_kajian', items)}
+                onCellEdit={(idx, value) => listCellRef.current('bahan_kajian', idx, value)}
                 showJudul={false}
               />
             </section>
@@ -841,15 +924,38 @@ export function Editor({ project, onUpdate, onSave, onExport, onOpenAISettings, 
                 <table className="w-full">
                   <thead>
                     <tr className="bg-gray-50">
+                      <th className="text-left text-sm font-medium text-gray-700 p-2 w-12"></th>
                       <th className="text-left text-sm font-medium text-gray-700 p-2">No</th>
                       <th className="text-left text-sm font-medium text-gray-700 p-2">Komponen Penilaian</th>
                       <th className="text-left text-sm font-medium text-gray-700 p-2 w-24">Bobot (%)</th>
-                      <th className="text-left text-sm font-medium text-gray-700 p-2 w-32"></th>
+                      <th className="text-left text-sm font-medium text-gray-700 p-2 w-16">Aksi</th>
                     </tr>
                   </thead>
                   <tbody>
                     {getPenilaian().map((item, idx) => (
                       <tr key={idx} className="border-t">
+                        <td className="p-2">
+                          <RowActions
+                            idx={idx}
+                            total={getPenilaian().length}
+                            onMoveUp={() => {
+                              if (idx === 0) return
+                              const items = [...getPenilaian()]
+                              const [moved] = items.splice(idx, 1)
+                              items.splice(idx - 1, 0, moved)
+                              logger.debug('EDITOR', 'editor.penilaian.move', { from: idx, to: idx - 1 })
+                              updatePenilaian(items)
+                            }}
+                            onMoveDown={() => {
+                              const items = [...getPenilaian()]
+                              if (idx >= items.length - 1) return
+                              const [moved] = items.splice(idx, 1)
+                              items.splice(idx + 1, 0, moved)
+                              logger.debug('EDITOR', 'editor.penilaian.move', { from: idx, to: idx + 1 })
+                              updatePenilaian(items)
+                            }}
+                          />
+                        </td>
                         <td className="p-2 text-sm text-gray-500">{idx + 1}</td>
                         <td className="p-2">
                           <input
@@ -878,31 +984,17 @@ export function Editor({ project, onUpdate, onSave, onExport, onOpenAISettings, 
                           />
                         </td>
                         <td className="p-2">
-                          <RowActions
-                            idx={idx}
-                            total={getPenilaian().length}
-                            onMoveUp={() => {
-                              if (idx === 0) return
-                              const items = [...getPenilaian()]
-                              const [moved] = items.splice(idx, 1)
-                              items.splice(idx - 1, 0, moved)
-                              logger.debug('EDITOR', 'editor.penilaian.move', { from: idx, to: idx - 1 })
-                              updatePenilaian(items)
-                            }}
-                            onMoveDown={() => {
-                              const items = [...getPenilaian()]
-                              if (idx >= items.length - 1) return
-                              const [moved] = items.splice(idx, 1)
-                              items.splice(idx + 1, 0, moved)
-                              logger.debug('EDITOR', 'editor.penilaian.move', { from: idx, to: idx + 1 })
-                              updatePenilaian(items)
-                            }}
-                            onDelete={() => {
+                          <button
+                            onClick={() => {
                               const items = getPenilaian().filter((_, i) => i !== idx)
                               logger.debug('EDITOR', 'editor.penilaian.remove', { index: idx, remaining: items.length })
                               updatePenilaian(items)
                             }}
-                          />
+                            className="row-action-btn row-action-btn-delete"
+                            title="Hapus baris"
+                          >
+                            <TrashIcon size={16} />
+                          </button>
                         </td>
                       </tr>
                     ))}
@@ -990,7 +1082,7 @@ export function Editor({ project, onUpdate, onSave, onExport, onOpenAISettings, 
                       <td colSpan={2} className="border p-1">
                         <RTE
                           content={item.subCpmk}
-                          onUpdate={(html) => updatePertemuanField(idx, 'subCpmk', html)}
+                          onUpdate={(html) => pertCellRef.current(idx, 'subCpmk', html)}
                           placeholder={`Sub-CPMK pertemuan ${item.no}`}
                           compact
                         />
@@ -998,7 +1090,7 @@ export function Editor({ project, onUpdate, onSave, onExport, onOpenAISettings, 
                       <td colSpan={2} className="border p-1">
                         <RTE
                           content={item.indikator}
-                          onUpdate={(html) => updatePertemuanField(idx, 'indikator', html)}
+                          onUpdate={(html) => pertCellRef.current(idx, 'indikator', html)}
                           placeholder="Indikator"
                           compact
                         />
@@ -1006,7 +1098,7 @@ export function Editor({ project, onUpdate, onSave, onExport, onOpenAISettings, 
                       <td colSpan={4} className="border p-1">
                         <RTE
                           content={item.kriteriaTeknik}
-                          onUpdate={(html) => updatePertemuanField(idx, 'kriteriaTeknik', html)}
+                          onUpdate={(html) => pertCellRef.current(idx, 'kriteriaTeknik', html)}
                           placeholder="Kriteria & Teknik"
                           compact
                         />
@@ -1014,7 +1106,7 @@ export function Editor({ project, onUpdate, onSave, onExport, onOpenAISettings, 
                       <td className="border p-1">
                         <RTE
                           content={item.bentukMetodePenugasan}
-                          onUpdate={(html) => updatePertemuanField(idx, 'bentukMetodePenugasan', html)}
+                          onUpdate={(html) => pertCellRef.current(idx, 'bentukMetodePenugasan', html)}
                           placeholder="Bentuk/Metode/Penugasan"
                           compact
                         />
@@ -1022,7 +1114,7 @@ export function Editor({ project, onUpdate, onSave, onExport, onOpenAISettings, 
                       <td colSpan={3} className="border p-1">
                         <RTE
                           content={item.daring}
-                          onUpdate={(html) => updatePertemuanField(idx, 'daring', html)}
+                          onUpdate={(html) => pertCellRef.current(idx, 'daring', html)}
                           placeholder="Daring"
                           compact
                         />
@@ -1030,7 +1122,7 @@ export function Editor({ project, onUpdate, onSave, onExport, onOpenAISettings, 
                       <td colSpan={2} className="border p-1">
                         <RTE
                           content={item.materiPustaka}
-                          onUpdate={(html) => updatePertemuanField(idx, 'materiPustaka', html)}
+                          onUpdate={(html) => pertCellRef.current(idx, 'materiPustaka', html)}
                           placeholder="Materi [Pustaka]"
                           compact
                         />
@@ -1144,18 +1236,6 @@ export function Editor({ project, onUpdate, onSave, onExport, onOpenAISettings, 
           <button className="context-menu-item" onClick={() => { handlePaste(); closeContextMenu() }}>
             <span className="context-menu-icon">📋</span> Paste
           </button>
-        </div>
-      )}
-
-      {/* Toast notification */}
-      {toast && (
-        <div className={`toast-notification toast-${toast.type}`}>
-          <span className="toast-icon">
-            {toast.type === 'info' && '✓'}
-            {toast.type === 'warning' && '⚠'}
-            {toast.type === 'error' && '✕'}
-          </span>
-          <span className="toast-message">{toast.message}</span>
         </div>
       )}
 

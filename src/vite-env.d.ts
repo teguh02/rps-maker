@@ -3,6 +3,9 @@
 export {}
 
 declare global {
+  /** Real app version from package.json, injected at build time by Vite. */
+  const __APP_VERSION__: string
+
   interface ElectronAPI {
     openFile: () => Promise<{ filePath: string; data: any } | null>
     openProject: (filePath: string) => Promise<{ filePath: string; data: any } | null>
@@ -14,6 +17,7 @@ declare global {
     addRecent: (filePath: string) => Promise<any[]>
     clearRecent: () => Promise<any[]>
     writeFileToPath: (filePath: string, buffer: Uint8Array) => Promise<boolean>
+    exportPdfHtml: (filePath: string, html: string) => Promise<boolean>
     aiGenerate: (options: { apiHost: string; apiKey: string; model: string; systemPrompt: string; userPrompt: string }) => Promise<{ ok: boolean; content?: string; error?: string }>
 
     onMenuNew: (callback: () => void) => () => void

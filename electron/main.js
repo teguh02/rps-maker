@@ -42,8 +42,9 @@ function createWindow() {
   mainWindow = new BrowserWindow({
     width: 1200,
     height: 800,
-    minWidth: 800,
-    minHeight: 600,
+    minWidth: 1200,
+    minHeight: 800,
+    show: false,
     title: 'RPS Maker UNISINA',
     autoHideMenuBar: true,
     icon: iconPath,
@@ -54,6 +55,8 @@ function createWindow() {
     },
   });
 
+  mainWindow.maximize();
+  mainWindow.show();
   mainWindow.setMenuBarVisibility(false);
 
   if (process.env.NODE_ENV === 'development' || !app.isPackaged) {
@@ -67,6 +70,23 @@ function createWindow() {
     mainWindow = null;
   });
 }
+
+/* ── Fullscreen toggle (maximize/unmaximize) ── */
+ipcMain.handle('window:toggle-fullscreen', () => {
+  if (!mainWindow) return false;
+  if (mainWindow.isMaximized()) {
+    mainWindow.unmaximize();
+    return false;
+  } else {
+    mainWindow.maximize();
+    return true;
+  }
+});
+
+ipcMain.handle('window:is-fullscreen', () => {
+  if (!mainWindow) return false;
+  return mainWindow.isMaximized();
+});
 
 function getRecentPath() {
   const userData = app.getPath('userData');
@@ -256,6 +276,47 @@ ipcMain.handle('recent:clear', () => {
   log.info('IPC', 'recent:clear');
   writeRecent([]);
   return [];
+});
+
+// Print an HTML document (the exact Preview HTML) to a PDF file using Chromium's
+// own print engine. This is far more reliable than html2canvas + jsPDF.
+ipcMain.handle('pdf:export-html', async (event, filePath, html) => {
+  if (typeof filePath !== 'string' || typeof html !== 'string') {
+    log.error('IPC', 'pdf:export-html_bad_args', { filePath, hasHtml: typeof html === 'string' });
+    return false;
+  }
+  let tmpFile = null;
+  let win = null;
+  try {
+    tmpFile = path.join(app.getPath('temp'), `rps-print-${Date.now()}.html`);
+    fs.writeFileSync(tmpFile, html, 'utf-8');
+
+    win = new BrowserWindow({
+      show: false,
+      width: 794,
+      height: 1123,
+      webPreferences: { offscreen: false, sandbox: true, contextIsolation: true },
+    });
+    await win.loadFile(tmpFile);
+    // Let the layout/type settle before printing.
+    await new Promise((resolve) => setTimeout(resolve, 400));
+
+    const pdfBuffer = await win.webContents.printToPDF({
+      printBackground: true,
+      preferCSSPageSize: true,
+    });
+    fs.writeFileSync(filePath, pdfBuffer);
+    log.info('IPC', 'pdf:export-html_done', { filePath, bytes: pdfBuffer.byteLength });
+    return true;
+  } catch (err) {
+    log.error('IPC', 'pdf:export-html_error', { filePath, error: err.message });
+    return false;
+  } finally {
+    if (win && !win.isDestroyed()) win.destroy();
+    if (tmpFile) {
+      try { fs.unlinkSync(tmpFile); } catch (e) { /* ignore */ }
+    }
+  }
 });
 
 ipcMain.handle('ai:generate', async (_, { apiHost, apiKey, model, systemPrompt, userPrompt }) => {

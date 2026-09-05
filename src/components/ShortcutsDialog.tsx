@@ -32,7 +32,7 @@ export function ShortcutsDialog({ open, onClose }: ShortcutsDialogProps) {
 
   return (
     <div className="dialog-backdrop" onClick={onClose}>
-      <div className="dialog-panel max-w-xl" onClick={(e) => e.stopPropagation()}>
+      <div className="dialog-panel max-w-4xl" onClick={(e) => e.stopPropagation()}>
         <div className="dialog-header">
           <h2 className="text-lg font-bold">⌨️ Pintasan Keyboard</h2>
           <p className="text-sm text-gray-500 mt-1">
@@ -41,44 +41,50 @@ export function ShortcutsDialog({ open, onClose }: ShortcutsDialogProps) {
           </p>
         </div>
 
-        <div className="dialog-body max-h-[60vh] overflow-y-auto">
-          <ShortcutGroup title="File / Project">
-            <ShortcutRow desc="Proyek baru" keys={<><Kbd>{MOD}+N</Kbd></>} />
-            <ShortcutRow desc="Buka proyek" keys={<><Kbd>{MOD}+O</Kbd></>} />
-            <ShortcutRow desc="Simpan" keys={<><Kbd>{MOD}+S</Kbd></>} />
-            <ShortcutRow desc="Simpan sebagai" keys={<><Kbd>{MOD}+Shift+S</Kbd></>} />
-            <ShortcutRow desc="Ekspor (pilih Word/PDF)" keys={<><Kbd>{MOD}+E</Kbd></>} />
-            <ShortcutRow desc="Ekspor PDF" keys={<><Kbd>{MOD}+P</Kbd></>} />
-            <ShortcutRow desc="Ekspor Word" keys={<><Kbd>{MOD}+Shift+E</Kbd></>} />
-            <ShortcutRow desc="Import kurikulum" keys={<><Kbd>{MOD}+Shift+I</Kbd></>} />
-          </ShortcutGroup>
+        <div className="dialog-body max-h-[70vh] overflow-y-auto">
+          <div className="grid grid-cols-2 gap-x-8">
+            <div>
+              <ShortcutGroup title="File / Project">
+                <ShortcutRow desc="Proyek baru" keys={<><Kbd>{MOD}+N</Kbd></>} />
+                <ShortcutRow desc="Buka proyek" keys={<><Kbd>{MOD}+O</Kbd></>} />
+                <ShortcutRow desc="Simpan" keys={<><Kbd>{MOD}+S</Kbd></>} />
+                <ShortcutRow desc="Simpan sebagai" keys={<><Kbd>{MOD}+Shift+S</Kbd></>} />
+                <ShortcutRow desc="Ekspor (pilih Word/PDF)" keys={<><Kbd>{MOD}+E</Kbd></>} />
+                <ShortcutRow desc="Ekspor PDF" keys={<><Kbd>{MOD}+P</Kbd></>} />
+                <ShortcutRow desc="Ekspor Word" keys={<><Kbd>{MOD}+Shift+E</Kbd></>} />
+                <ShortcutRow desc="Import kurikulum" keys={<><Kbd>{MOD}+Shift+I</Kbd></>} />
+              </ShortcutGroup>
 
-          <ShortcutGroup title="Pemformatan Teks (di dalam kolom RPS)">
-            <ShortcutRow desc="Tebal / miring / garis bawah" keys={<><Kbd>{MOD}+B</Kbd> <Kbd>{MOD}+I</Kbd> <Kbd>{MOD}+U</Kbd></>} />
-            <ShortcutRow desc="Coret (strikethrough)" keys={<><Kbd>{MOD}+Shift+X</Kbd></>} />
-            <ShortcutRow desc="Daftar bernomor / berpoin" keys={<><Kbd>{MOD}+Shift+7</Kbd> <Kbd>{MOD}+Shift+8</Kbd></>} />
-            <ShortcutRow desc="Tempel tanpa format" keys={<><Kbd>{MOD}+Shift+V</Kbd></>} />
-          </ShortcutGroup>
+              <ShortcutGroup title="Undo / Redo Dokumen">
+                <ShortcutRow desc="Undo (di luar kolom teks)" keys={<><Kbd>{MOD}+Z</Kbd></>} />
+                <ShortcutRow desc="Redo (di luar kolom teks)" keys={<><Kbd>{MOD}+Y</Kbd> <Kbd>{MOD}+Shift+Z</Kbd></>} />
+                <ShortcutRow
+                  desc="Di dalam kolom teks"
+                  keys={<><span className="text-xs text-gray-500">undo/redo otomatis per kolom</span></>}
+                />
+              </ShortcutGroup>
+            </div>
 
-          <ShortcutGroup title="Undo / Redo Dokumen">
-            <ShortcutRow desc="Undo (di luar kolom teks)" keys={<><Kbd>{MOD}+Z</Kbd></>} />
-            <ShortcutRow desc="Redo (di luar kolom teks)" keys={<><Kbd>{MOD}+Y</Kbd> <Kbd>{MOD}+Shift+Z</Kbd></>} />
-            <ShortcutRow
-              desc="Di dalam kolom teks"
-              keys={<><span className="text-xs text-gray-500">undo/redo otomatis per kolom</span></>}
-            />
-          </ShortcutGroup>
+            <div>
+              <ShortcutGroup title="Pemformatan Teks (di dalam kolom RPS)">
+                <ShortcutRow desc="Tebal / miring / garis bawah" keys={<><Kbd>{MOD}+B</Kbd> <Kbd>{MOD}+I</Kbd> <Kbd>{MOD}+U</Kbd></>} />
+                <ShortcutRow desc="Coret (strikethrough)" keys={<><Kbd>{MOD}+Shift+X</Kbd></>} />
+                <ShortcutRow desc="Daftar bernomor / berpoin" keys={<><Kbd>{MOD}+Shift+7</Kbd> <Kbd>{MOD}+Shift+8</Kbd></>} />
+                <ShortcutRow desc="Tempel tanpa format" keys={<><Kbd>{MOD}+Shift+V</Kbd></>} />
+              </ShortcutGroup>
 
-          <ShortcutGroup title="Tampilan (Zoom)">
-            <ShortcutRow desc="Perbesar" keys={<><Kbd>{MOD}+Wheel</Kbd> <Kbd>{MOD}+=</Kbd></>} />
-            <ShortcutRow desc="Perkecil" keys={<><Kbd>{MOD}+-</Kbd></>} />
-            <ShortcutRow desc="Reset ke 100%" keys={<><Kbd>{MOD}+0</Kbd></>} />
-          </ShortcutGroup>
+              <ShortcutGroup title="Tampilan (Zoom)">
+                <ShortcutRow desc="Perbesar" keys={<><Kbd>{MOD}+Wheel</Kbd> <Kbd>{MOD}+=</Kbd></>} />
+                <ShortcutRow desc="Perkecil" keys={<><Kbd>{MOD}+-</Kbd></>} />
+                <ShortcutRow desc="Reset ke 100%" keys={<><Kbd>{MOD}+0</Kbd></>} />
+              </ShortcutGroup>
 
-          <ShortcutGroup title="Lainnya">
-            <ShortcutRow desc="Buka panduan section aktif" keys={<><Kbd>F1</Kbd></>} />
-            <ShortcutRow desc="Tutup dialog / menu konteks" keys={<><Kbd>Esc</Kbd></>} />
-          </ShortcutGroup>
+              <ShortcutGroup title="Lainnya">
+                <ShortcutRow desc="Buka panduan section aktif" keys={<><Kbd>F1</Kbd></>} />
+                <ShortcutRow desc="Tutup dialog / menu konteks" keys={<><Kbd>Esc</Kbd></>} />
+              </ShortcutGroup>
+            </div>
+          </div>
         </div>
 
         <div className="dialog-footer">

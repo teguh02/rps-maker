@@ -1,3 +1,13 @@
+/**
+ * DOCX + PDF export.
+ *
+ * Both exports are built from the SAME canonical RPS layout as the in-app
+ * Preview (see rpsDocument.ts):
+ *   - PDF  → the exact HTML string shown in Preview is printed by Electron's
+ *            printToPDF (no html2canvas), so Preview and the downloaded PDF
+ *            are byte-for-byte the same document.
+ *   - DOCX → the same sections, rendered as native Word tables/paragraphs.
+ */
 import {
   Document,
   Packer,
@@ -8,34 +18,58 @@ import {
   TableCell,
   Table,
   WidthType,
-  PageOrientation,
   VerticalAlign,
   ShadingType,
   BorderStyle,
-  ImageRun,
+  PageBreak,
 } from 'docx'
-import html2pdf from 'html2pdf.js'
 import { logger } from '../utils/logger'
-import { stripHtml } from '../utils/html'
-import logoDataUrl from '../assets/logo-unisina.png?inline'
+import { buildRpsHtml, fullDate } from './rpsDocument'
 
-interface ExportData {
+export interface ExportData {
   content: Record<string, string>
 }
 
+// ─────────────────────────── shared plain helpers ───────────────────────────
+
+/** rich text → plain lines */
+function plainLines(html: string): string[] {
+  return (html || '')
+    .replace(/<br\s*\/?>/gi, '\n')
+    .replace(/<\/(p|div|li|h[1-6])>/gi, '\n')
+    .replace(/<[^>]+>/g, '')
+    .replace(/&nbsp;/g, ' ')
+    .replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&quot;/g, '"').replace(/&#39;/g, "'")
+    .split('\n')
+    .map(s => s.trim())
+    .filter(Boolean)
+}
+
 interface StructuredItem {
-  label: string
-  deskripsi: string
-  cpmk?: string
+  label?: string
+  deskripsi?: string
   judul?: string
 }
 
-interface PenilaianItem {
-  item: string
-  bobot: number
+function parseStructured(json: string): StructuredItem[] {
+  try {
+    const arr = JSON.parse(json || '[]')
+    return Array.isArray(arr) ? arr : []
+  } catch {
+    return []
+  }
 }
 
-interface PertemuanItem {
+function parsePenilaian(json: string): Array<{ item: string; bobot: number }> {
+  try {
+    const arr = JSON.parse(json || '[]')
+    return Array.isArray(arr) ? arr : []
+  } catch {
+    return []
+  }
+}
+
+interface PertemuanRow {
   no: number
   subCpmk: string
   indikator: string
@@ -49,594 +83,389 @@ interface PertemuanItem {
   label?: string
 }
 
-// ── Shared table model (mirrors the Excel→HTML reference layout) ──
-
-interface Cell {
-  /** Plain text (rich text is passed via html) */
-  text?: string
-  /** Rich HTML — rendered as-is in PDF, flattened for DOCX */
-  html?: string
-  colSpan?: number
-  rowSpan?: number
-  bold?: boolean
-  center?: boolean
-  fill?: string
-  size?: number
+function parsePertemuan(json: string): PertemuanRow[] {
+  try {
+    const arr = JSON.parse(json || '[]')
+    return Array.isArray(arr) ? arr : []
+  } catch {
+    return []
+  }
 }
 
-type Row = Cell[]
+// ─────────────────────────── DOCX building ───────────────────────────
 
-const TOTAL_COLS = 14
+const FONT = 'Times New Roman'
+const FONT_TWIPS = { ascii: FONT, hAnsi: FONT, cs: FONT }
 
-function parseStructuredList(json: string): StructuredItem[] {
-  try { return JSON.parse(json || '[]') } catch { return [] }
+/** Rich text → Paragraph[] with hard line breaks preserved */
+function richParagraphs(html: string, sizeHalf: number, bold = false, align: (typeof AlignmentType)[keyof typeof AlignmentType] = AlignmentType.JUSTIFIED): Paragraph[] {
+  const lines = plainLines(html)
+  if (lines.length === 0) {
+    return [new Paragraph({ alignment: align, spacing: { after: 40 }, children: [new TextRun({ text: '', size: sizeHalf, bold, font: FONT_TWIPS })] })]
+  }
+  return lines.map(line => new Paragraph({
+    alignment: align,
+    spacing: { after: 40 },
+    children: [new TextRun({ text: line, size: sizeHalf, bold, font: FONT_TWIPS })],
+  }))
 }
 
-function parsePenilaian(json: string): PenilaianItem[] {
-  try { return JSON.parse(json || '[]') } catch { return [] }
+const cellBorders = {
+  top: { style: BorderStyle.SINGLE, size: 4, color: '000000' },
+  bottom: { style: BorderStyle.SINGLE, size: 4, color: '000000' },
+  left: { style: BorderStyle.SINGLE, size: 4, color: '000000' },
+  right: { style: BorderStyle.SINGLE, size: 4, color: '000000' },
 }
 
-function parsePertemuan(json: string): PertemuanItem[] {
-  try { return JSON.parse(json || '[]') } catch { return [] }
+function textCell(text: string, opts: { bold?: boolean; center?: boolean; size?: number; fill?: string; widthPct?: number } = {}): TableCell {
+  const runs: TextRun[] = plainLines(text).map((line, i) =>
+    new TextRun({
+      text: line,
+      bold: opts.bold,
+      size: opts.size ?? 20, // 10pt
+      font: FONT_TWIPS,
+      break: i > 0 ? 1 : 0,
+    }))
+  if (runs.length === 0) {
+    runs.push(new TextRun({ text: '', size: opts.size ?? 20, font: FONT_TWIPS }))
+  }
+  return new TableCell({
+    width: opts.widthPct != null ? { size: opts.widthPct, type: WidthType.PERCENTAGE } : undefined,
+    verticalAlign: VerticalAlign.CENTER,
+    shading: opts.fill ? { type: ShadingType.CLEAR, fill: opts.fill } : undefined,
+    margins: { top: 40, bottom: 40, left: 80, right: 80 },
+    borders: cellBorders,
+    children: [new Paragraph({ alignment: opts.center ? AlignmentType.CENTER : AlignmentType.LEFT, children: runs })],
+  })
 }
 
-const monthNames: Record<string, string> = {
+function richCell(html: string, opts: { size?: number; center?: boolean; widthPct?: number } = {}): TableCell {
+  return textCell(plainLines(html).join('\n'), opts)
+}
+
+function tableRow(cells: TableCell[]): TableRow {
+  return new TableRow({ children: cells })
+}
+
+function table100(rows: TableRow[]): Table {
+  return new Table({ width: { size: 100, type: WidthType.PERCENTAGE }, rows })
+}
+
+function heading(text: string, sizeHalf = 26, before = 160, after = 80): Paragraph {
+  return new Paragraph({
+    alignment: AlignmentType.CENTER,
+    spacing: { before, after },
+    children: [new TextRun({ text, bold: true, size: sizeHalf, font: FONT_TWIPS })],
+  })
+}
+
+function sectionTitle(text: string, before = 200): Paragraph {
+  return new Paragraph({
+    spacing: { before, after: 100 },
+    children: [new TextRun({ text, bold: true, size: 22, font: FONT_TWIPS })],
+  })
+}
+
+function buildDocx(c: Record<string, string>): Document {
+  const sksT = (c.sks_t || '0').trim()
+  const sksP = (c.sks_p || '0').trim()
+  const mk = c.mata_kuliah || ''
+  const kode = c.kode_mk || ''
+  const ta = c.semester_akademik || ''
+  const sem = c.semester === 'Ganjil' ? 'GANJIL' : c.semester === 'Genap' ? 'GENAP' : (c.semester || '').toUpperCase()
+  const dateTxt = fullDate(c.tgl_penyusunan)
+
+  const children: Array<Paragraph | Table> = []
+
+  // ── Cover ──
+  children.push(new Paragraph({ spacing: { before: 4000 }, children: [] }))
+  children.push(heading('RENCANA PEMBELAJARAN SEMESTER (RPS)', 30))
+  children.push(heading(sem, 26, 60))
+  children.push(heading(`TAHUN AKADEMIK ${ta}`, 26, 60))
+  children.push(new Paragraph({ spacing: { before: 1600 }, children: [] }))
+  children.push(heading(`${mk}${kode ? ` (${kode})` : ''}`, 34, 60, 200))
+  children.push(heading(c.prodi ? `PRODI ${c.prodi.toUpperCase()}` : '', 24, 60, 200))
+  children.push(new Paragraph({ alignment: AlignmentType.CENTER, spacing: { before: 400 }, children: [new TextRun({ text: 'Disusun Oleh :', size: 22, font: FONT_TWIPS })] }))
+  const disusunNames: string[] = []
+  if (c.pengembang_rps) disusunNames.push(...plainLines(c.pengembang_rps))
+  if (c.dosen_pengampu) plainLines(c.dosen_pengampu).forEach(n => { if (!disusunNames.includes(n)) disusunNames.push(n) })
+  disusunNames.forEach(n => children.push(new Paragraph({
+    alignment: AlignmentType.CENTER,
+    spacing: { after: 0 },
+    children: [new TextRun({ text: n, bold: true, size: 24, font: FONT_TWIPS })],
+  })))
+  if (c.nidn_pengembang) children.push(new Paragraph({
+    alignment: AlignmentType.CENTER,
+    spacing: { before: 40 },
+    children: [new TextRun({ text: `NIDN. ${c.nidn_pengembang}`, size: 18, font: FONT_TWIPS })],
+  }))
+  children.push(new Paragraph({ spacing: { before: 5000 }, children: [] }))
+  children.push(heading('STIKes IBNU SINA AJIBARANG', 28, 0))
+  children.push(heading(coverMonthYear(c.tgl_penyusunan), 22, 80))
+
+  // ── Content ──
+  children.push(new Paragraph({ children: [new PageBreak()] }))
+
+  // header block
+  children.push(new Paragraph({
+    alignment: AlignmentType.CENTER,
+    spacing: { after: 40 },
+    children: [new TextRun({ text: 'STIKes IBNU SINA AJIBARANG', bold: true, size: 24, font: FONT_TWIPS })],
+  }))
+  children.push(new Paragraph({
+    alignment: AlignmentType.CENTER,
+    spacing: { after: 40 },
+    children: [new TextRun({ text: c.prodi ? `PROGRAM STUDI ${c.prodi.toUpperCase()}` : '', bold: true, size: 20, font: FONT_TWIPS })],
+  }))
+  children.push(new Paragraph({
+    alignment: AlignmentType.CENTER,
+    spacing: { after: 200 },
+    children: [new TextRun({ text: `Kode Dokumen : RPS/${prodiCode(c)}/${sem}/${(ta.split('-')[1] || '20__').trim()}`, size: 18, font: FONT_TWIPS })],
+  }))
+
+  children.push(heading('RENCANA PEMBELAJARAN SEMESTER', 28, 100, 200))
+  children.push(sectionTitle('A. Identitas Mata Kuliah'))
+  children.push(table100([
+    tableRow([textCell('MATA KULIAH (MK)', { bold: true, widthPct: 24 }), textCell(c.mata_kuliah || '', { widthPct: 76 })]),
+    tableRow([textCell('KODE', { bold: true, widthPct: 24 }), textCell(c.kode_mk || '', { widthPct: 76 })]),
+    tableRow([textCell('Rumpun MK', { bold: true, widthPct: 24 }), textCell(c.rumpun_mk || '', { widthPct: 76 })]),
+    tableRow([textCell('BOBOT (sks)', { bold: true, widthPct: 24 }), textCell(`T = ${sksT}    P = ${sksP}`, { widthPct: 76 })]),
+    tableRow([textCell('SEMESTER', { bold: true, widthPct: 24 }), textCell(c.semester || '', { widthPct: 76 })]),
+    tableRow([textCell('Tgl Penyusunan', { bold: true, widthPct: 24 }), textCell(dateTxt || '-', { widthPct: 76 })]),
+    tableRow([textCell('Dosen Pengampu', { bold: true, widthPct: 24 }), textCell(c.dosen_pengampu || '', { widthPct: 76 })]),
+    tableRow([textCell('Matakuliah Syarat', { bold: true, widthPct: 24 }), textCell(c.matakuliah_syarat || '-', { widthPct: 76 })]),
+  ]))
+
+  children.push(sectionTitle('B. Otorisasi'))
+  children.push(table100([
+    tableRow([
+      textCell('Pengembang RPS', { bold: true, center: true, widthPct: 33 }),
+      textCell('Koordinator RMK', { bold: true, center: true, widthPct: 34 }),
+      textCell('Ketua Program Studi', { bold: true, center: true, widthPct: 33 }),
+    ]),
+    tableRow([
+      textCell(`\n\n${c.pengembang_rps || ''}\n${c.nidn_pengembang ? `NIDN. ${c.nidn_pengembang}` : ''}`, { center: true, widthPct: 33 }),
+      textCell(`\n\n${c.koordinator_rmk || ''}`, { center: true, widthPct: 34 }),
+      textCell(`\n\n${c.kaprodi || ''}\n${c.nidn_kaprodi ? `NIDN. ${c.nidn_kaprodi}` : ''}`, { center: true, widthPct: 33 }),
+    ]),
+  ]))
+
+  children.push(sectionTitle('C. Capaian Pembelajaran (CP)'))
+  const cpTable = (label: string, items: StructuredItem[]) => {
+    if (items.length === 0) return
+    children.push(new Paragraph({
+      spacing: { before: 120, after: 80 },
+      children: [new TextRun({ text: label, bold: true, size: 20, font: FONT_TWIPS })],
+    }))
+    children.push(table100(items.map(it => tableRow([
+      textCell(it.label || '', { bold: true, widthPct: 16 }),
+      richCell(it.deskripsi || '', { widthPct: 84 }),
+    ]))))
+  }
+  cpTable('CPL-PRODI yang dibebankan pada MK', parseStructured(c.cpl))
+  cpTable('Capaian Pembelajaran Mata Kuliah (CPMK)', parseStructured(c.cpmk))
+  cpTable('Kemampuan Akhir Tiap Tahapan Belajar (Sub-CPMK)', parseStructured(c.sub_cpmk))
+
+  children.push(sectionTitle('D. Deskripsi Singkat Mata Kuliah'))
+  richParagraphs(c.deskripsi_mk || '', 20).forEach(p => children.push(p))
+
+  children.push(sectionTitle('E. Bahan Kajian : Materi Pembelajaran'))
+  const bahan = parseStructured(c.bahan_kajian)
+  if (bahan.length === 0) {
+    richParagraphs('', 20).forEach(p => children.push(p))
+  } else {
+    children.push(table100(bahan.map(b => tableRow([
+      textCell(b.label || '', { bold: true, widthPct: 8 }),
+      richCell(b.deskripsi || b.judul || '', { widthPct: 92 }),
+    ]))))
+  }
+
+  children.push(sectionTitle('F. Penilaian'))
+  const penilaian = parsePenilaian(c.penilaian)
+  const total = penilaian.reduce((s, p) => s + (p.bobot || 0), 0)
+  if (penilaian.length > 0) {
+    children.push(table100(penilaian.map(p => tableRow([
+      textCell(p.item || '', { widthPct: 30 }),
+      textCell(`${p.bobot || 0}%`, { widthPct: 70 }),
+    ]))))
+    children.push(new Paragraph({
+      spacing: { before: 60 },
+      children: [new TextRun({ text: `Total: ${total}%`, bold: true, size: 20, font: FONT_TWIPS })],
+    }))
+  }
+
+  children.push(sectionTitle('G. Pustaka'))
+  const pustaka = (title: string, value: string) => {
+    const lines = plainLines(value)
+    if (lines.length === 0) return
+    children.push(new Paragraph({
+      spacing: { before: 80, after: 40 },
+      children: [new TextRun({ text: title, bold: true, size: 20, font: FONT_TWIPS })],
+    }))
+    lines.forEach(l => children.push(new Paragraph({
+      spacing: { after: 40 },
+      children: [new TextRun({ text: l, size: 20, font: FONT_TWIPS })],
+    })))
+  }
+  pustaka('Utama:', c.pustaka_utama || '')
+  pustaka('Pendukung:', c.pustaka_pendukung || '')
+
+  // ── Pertemuan table ──
+  children.push(new Paragraph({ children: [new PageBreak()] }))
+  children.push(heading('JADWAL PELAKSANAAN PEMBELAJARAN / PERTEMUAN', 26, 0, 160))
+
+  const ptmHeaders = [
+    { h: 'No', w: 5 },
+    { h: 'Kemampuan Akhir Tiap Tahapan Belajar (Sub-CPMK)', w: 14 },
+    { h: 'Indikator', w: 12 },
+    { h: 'Kriteria & Teknik', w: 13 },
+    { h: 'Bentuk Pembelajaran, Metode Pembelajaran, Penugasan Mahasiswa, [Estimasi Waktu]', w: 18 },
+    { h: 'Luring (offline)', w: 10 },
+    { h: 'Daring (online)', w: 10 },
+    { h: 'Materi Pembelajaran [Pustaka]', w: 13 },
+    { h: 'Bobot (%)', w: 5 },
+  ]
+  const ptmRows: TableRow[] = []
+  ptmRows.push(tableRow(ptmHeaders.map(h => textCell(h.h, { bold: true, center: true, size: 16, fill: 'F1F5F9', widthPct: h.w }))))
+  const pertemuan = parsePertemuan(c.pertemuan)
+  if (pertemuan.length === 0) {
+    ptmRows.push(new TableRow({
+      children: [new TableCell({
+        columnSpan: 9,
+        borders: cellBorders,
+        children: [new Paragraph({
+          alignment: AlignmentType.CENTER,
+          children: [new TextRun({ text: 'Belum ada jadwal pertemuan. Gunakan \u201CGenerate dari Sub-CPMK\u201D di tab Pertemuan.', size: 16, italics: true, font: FONT_TWIPS })],
+        })],
+      })],
+    }))
+  } else {
+    pertemuan.forEach(r => {
+      if (r.type === 'uts' || r.type === 'uas') {
+        ptmRows.push(new TableRow({
+          children: [new TableCell({
+            columnSpan: 9,
+            borders: cellBorders,
+            shading: { type: ShadingType.CLEAR, fill: 'E8EDF5' },
+            children: [new Paragraph({
+              alignment: AlignmentType.CENTER,
+              children: [new TextRun({ text: r.label || (r.type === 'uts' ? 'Evaluasi Tengah Semester (UTS)' : 'Evaluasi Akhir Semester (UAS)'), bold: true, size: 16, font: FONT_TWIPS })],
+            })],
+          })],
+        }))
+        return
+      }
+      ptmRows.push(tableRow([
+        textCell(String(r.no ?? ''), { center: true, size: 16, widthPct: 5 }),
+        richCell(r.subCpmk || '', { size: 16, widthPct: 14 }),
+        richCell(r.indikator || '', { size: 16, widthPct: 12 }),
+        richCell(r.kriteriaTeknik || '', { size: 16, widthPct: 13 }),
+        richCell(r.bentukMetodePenugasan || '', { size: 16, widthPct: 18 }),
+        richCell(r.luring || '', { size: 16, widthPct: 10 }),
+        richCell(r.daring || '', { size: 16, widthPct: 10 }),
+        richCell(r.materiPustaka || '', { size: 16, widthPct: 13 }),
+        textCell(String(r.bobot || 0), { center: true, size: 16, widthPct: 5 }),
+      ]))
+    })
+  }
+  children.push(table100(ptmRows))
+
+  // ── TTD ──
+  children.push(new Paragraph({ children: [new PageBreak()] }))
+  children.push(heading('PENGESAHAN', 28, 0, 300))
+  const where = dateTxt ? `Ajibarang, ${dateTxt}` : 'Ajibarang,'
+  /** Signature box: header line, reserved space, dotted-ish gap, then name/NIDN/role */
+  const sigCell = (top: string, name: string, nidn: string, role: string) => new TableCell({
+    width: { size: 50, type: WidthType.PERCENTAGE },
+    verticalAlign: VerticalAlign.CENTER,
+    borders: cellBorders,
+    margins: { top: 120, bottom: 120, left: 120, right: 120 },
+    children: [
+      new Paragraph({ alignment: AlignmentType.CENTER, spacing: { after: 2600 }, children: [new TextRun({ text: top || ' ', size: 20, font: FONT_TWIPS })] }),
+      new Paragraph({ alignment: AlignmentType.CENTER, spacing: { before: 100 }, children: [new TextRun({ text: name || ' ', bold: true, size: 22, font: FONT_TWIPS })] }),
+      ...(nidn ? [new Paragraph({ alignment: AlignmentType.CENTER, children: [new TextRun({ text: `NIDN. ${nidn}`, size: 18, font: FONT_TWIPS })] })] : []),
+      new Paragraph({ alignment: AlignmentType.CENTER, spacing: { before: 80 }, children: [new TextRun({ text: role, size: 18, font: FONT_TWIPS })] }),
+    ],
+  })
+  children.push(table100([
+    tableRow([
+      sigCell(where, c.dosen_pengampu || '', '', 'Dosen Pengampu'),
+      sigCell(where, c.pengembang_rps || '', c.nidn_pengembang || '', 'Pengembang RPS'),
+    ]),
+  ]))
+  children.push(table100([
+    tableRow([
+      sigCell('Mengetahui,', c.kaprodi || '', c.nidn_kaprodi || '', c.prodi ? `Kaprodi ${c.prodi}` : 'Kaprodi'),
+      sigCell('Mengetahui,', c.wakil_ketua_i || '', c.nidn_wakil_ketua_i || '', 'Wakil Ketua I Bidang Akademik'),
+    ]),
+  ]))
+  children.push(table100([
+    new TableRow({
+      children: [new TableCell({
+        columnSpan: 2,
+        borders: cellBorders,
+        verticalAlign: VerticalAlign.CENTER,
+        margins: { top: 120, bottom: 120, left: 120, right: 120 },
+        children: [
+          new Paragraph({ alignment: AlignmentType.CENTER, spacing: { after: 2600 }, children: [new TextRun({ text: 'Mengetahui,', size: 20, font: FONT_TWIPS })] }),
+          new Paragraph({ alignment: AlignmentType.CENTER, children: [new TextRun({ text: c.ketua_stikes || ' ', bold: true, size: 22, font: FONT_TWIPS })] }),
+          new Paragraph({ alignment: AlignmentType.CENTER, children: [new TextRun({ text: c.nidn_ketua_stikes ? `NIDN. ${c.nidn_ketua_stikes}` : '', size: 18, font: FONT_TWIPS })] }),
+          new Paragraph({ alignment: AlignmentType.CENTER, spacing: { before: 80 }, children: [new TextRun({ text: 'Ketua STIKes Ibnu Sina Ajibarang', size: 18, font: FONT_TWIPS })] }),
+        ],
+      })],
+    }),
+  ]))
+
+  return new Document({
+    creator: 'RPS Maker UNISINA',
+    title: `RPS ${mk}`,
+    styles: { default: { document: { run: { font: FONT_TWIPS, size: 21 } } } },
+    sections: [{ properties: {}, children }],
+  })
+}
+
+function prodiCode(c: Record<string, string>): string {
+  return (c.prodi || '').toUpperCase().replace(/[^A-Z0-9]/g, '') || 'PRODI'
+}
+
+const MONTHS_UP: Record<string, string> = {
   '01': 'JANUARI', '02': 'FEBRUARI', '03': 'MARET', '04': 'APRIL',
   '05': 'MEI', '06': 'JUNI', '07': 'JULI', '08': 'AGUSTUS',
   '09': 'SEPTEMBER', '10': 'OKTOBER', '11': 'NOVEMBER', '12': 'DESEMBER',
 }
 
-function formatFullDate(dateStr: string): string {
+function coverMonthYear(dateStr: string): string {
   if (!dateStr) return ''
   const parts = dateStr.split('-')
-  if (parts.length === 3) {
-    const day = parts[2]
-    const month = monthNames[parts[1]] || parts[1]
-    const year = parts[0]
-    return `${day} ${month.charAt(0) + month.slice(1).toLowerCase()} ${year}`
-  }
-  return dateStr
+  if (parts.length !== 3) return dateStr
+  return `${MONTHS_UP[parts[1]] || parts[1]}, ${parts[0]}`
 }
 
-function cellText(cell: Cell): string {
-  if (cell.html) return stripHtml(cell.html)
-  return cell.text || ''
-}
-
-function escapeHtml(s: string): string {
-  return s
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;')
-}
-
-/** Split rich text / plain text into lines (for DOCX multi-paragraph cells) */
-function toLines(text: string): string[] {
-  return text
-    .split('\n')
-    .map(l => l.trim())
-    .filter(Boolean)
-}
-
-function prodiCode(prodi: string): string {
-  const upper = (prodi || '').toUpperCase().replace(/\s+/g, '')
-  return upper || 'S1FARMASI'
-}
-
-function rpsCode(c: Record<string, string>): string {
-  const semester = c.semester === 'Ganjil' ? 'GANJIL' : c.semester === 'Genap' ? 'GENAP' : 'GENAP'
-  const year = (c.semester_akademik || '2025-2026').split('-')[1] || '2026'
-  return `RPS/${prodiCode(c.prodi)}/${semester}/${year}`
-}
-
-function headerLabel(c: Record<string, string>, label: string): string {
-  return label.replace('{prodi}', c.prodi || 'S1 FARMASI').replace('{tahun}', c.semester_akademik || '2025-2026')
-}
-
-// ── Row builders (reference layout) ──
-
-function buildMainRows(c: Record<string, string>): Row[] {
-  const rows: Row[] = []
-
-  const cplItems = parseStructuredList(c.cpl)
-  const cpmkItems = parseStructuredList(c.cpmk)
-  const subCpmkItems = parseStructuredList(c.sub_cpmk)
-  const bahanKajianItems = parseStructuredList(c.bahan_kajian)
-  const penilaianItems = parsePenilaian(c.penilaian)
-
-  // Header block (rows 1-3): logo | STIKES | code
-  const cpRowSpan = 1 + cplItems.length + 1 + cpmkItems.length + 1 + subCpmkItems.length
-
-  const logoCell: Cell = { html: '', text: '[LOGO]', colSpan: 2, rowSpan: 3, center: true }
-
-  rows.push([
-    logoCell,
-    { text: headerLabel(c, 'STIKES IBNU SINA AJIBARANG'), colSpan: 10, center: true, bold: true, size: 11 },
-    { text: rpsCode(c), colSpan: 2, rowSpan: 3, center: true, size: 9 },
-  ])
-  rows.push([
-    { text: headerLabel(c, 'PROGRAM STUDI {prodi}'), colSpan: 10, center: true, bold: true, size: 11 },
-  ])
-  rows.push([
-    { text: headerLabel(c, 'TAHUN AJARAN {tahun}'), colSpan: 10, center: true, bold: true, size: 11 },
-  ])
-
-  // Title
-  rows.push([
-    { text: 'RENCANA PEMBELAJARAN SEMESTER', colSpan: TOTAL_COLS, center: true, bold: true, size: 12, fill: 'F2F2F2' },
-  ])
-
-  // Identitas header
-  rows.push([
-    { text: 'MATA KULIAH (MK)', colSpan: 4, bold: true, center: true, fill: 'F2F2F2' },
-    { text: 'KODE', colSpan: 2, bold: true, center: true, fill: 'F2F2F2' },
-    { text: 'Rumpun MK', colSpan: 3, bold: true, center: true, fill: 'F2F2F2' },
-    { text: 'BOBOT (sks)', colSpan: 2, bold: true, center: true, fill: 'F2F2F2' },
-    { text: 'SEMESTER', bold: true, center: true, fill: 'F2F2F2' },
-    { text: 'Tgl Penyusunan', colSpan: 2, bold: true, center: true, fill: 'F2F2F2' },
-  ])
-
-  // Identitas values
-  rows.push([
-    { text: c.mata_kuliah || '', colSpan: 4 },
-    { text: c.kode_mk || '', colSpan: 2 },
-    { text: c.rumpun_mk || '', colSpan: 3 },
-    { text: `T= ${c.sks_t || '-'} P= ${c.sks_p || '-'}`, colSpan: 2, center: true },
-    { text: c.semester || '', center: true },
-    { text: formatFullDate(c.tgl_penyusunan), colSpan: 2 },
-  ])
-
-  // Otorisasi
-  rows.push([
-    { text: 'OTORISASI', colSpan: 4, rowSpan: 2, center: true, bold: true, fill: 'F2F2F2' },
-    { text: 'Pengembang RPS', colSpan: 3, bold: true, center: true, fill: 'F2F2F2' },
-    { text: 'Koordinator RMK', colSpan: 4, bold: true, center: true, fill: 'F2F2F2' },
-    { text: 'Ketua Program Studi', colSpan: 3, bold: true, center: true, fill: 'F2F2F2' },
-  ])
-  rows.push([
-    { text: c.pengembang_rps || '', colSpan: 3, center: true },
-    { text: c.koordinator_rmk || '', colSpan: 4, center: true },
-    { text: c.kaprodi || '', colSpan: 3, center: true },
-  ])
-
-  // CP block
-  rows.push([
-    { text: 'Capaian Pembelajaran (CP)', colSpan: 2, rowSpan: cpRowSpan, center: true, bold: true, fill: 'F2F2F2' },
-    { text: 'CPL-PRODI yang dibebankan pada MK', colSpan: 5, bold: true, fill: 'F2F2F2' },
-    { text: '', colSpan: 7 },
-  ])
-  cplItems.forEach(item => {
-    rows.push([
-      { text: item.label || 'CPL', bold: true, center: true },
-      { text: item.deskripsi || '', colSpan: 11 },
-    ])
-  })
-  rows.push([
-    { text: 'Capaian Pembelajaran Mata Kuliah (CPMK)', colSpan: 5, bold: true, fill: 'F2F2F2' },
-    { text: '', colSpan: 7 },
-  ])
-  cpmkItems.forEach(item => {
-    rows.push([
-      { text: item.label || 'CPMK', bold: true, center: true },
-      { text: item.deskripsi || '', colSpan: 11 },
-    ])
-  })
-  rows.push([
-    { text: 'Kemampuan akhir tiap tahapan belajar (Sub-CPMK)', colSpan: 5, bold: true, fill: 'F2F2F2' },
-    { text: '', colSpan: 7 },
-  ])
-  subCpmkItems.forEach(item => {
-    rows.push([
-      { text: item.label || 'Sub-CPMK', bold: true, center: true },
-      { text: item.deskripsi || '', colSpan: 11 },
-    ])
-  })
-
-  // Deskripsi Singkat MK
-  rows.push([
-    { text: 'Deskripsi Singkat MK', colSpan: 2, bold: true, center: true, fill: 'F2F2F2' },
-    { html: c.deskripsi_mk || '', colSpan: 12 },
-  ])
-
-  // Bahan Kajian
-  rows.push([
-    { text: 'Bahan Kajian: Materi Pembelajaran', colSpan: 2, rowSpan: Math.max(bahanKajianItems.length, 1), center: true, bold: true, fill: 'F2F2F2' },
-    ...(bahanKajianItems.length === 0
-      ? [{ text: 'Belum diisi', colSpan: 12 }]
-      : bahanKajianItems.map((item, idx): Cell => ({
-          text: `${item.label || idx + 1}. ${[item.judul, item.deskripsi].filter(Boolean).join(' ')}`,
-          colSpan: 12,
-        }))),
-  ])
-
-  // Penilaian
-  rows.push([
-    { text: 'Penilaian', colSpan: 2, rowSpan: Math.max(penilaianItems.length, 1), center: true, bold: true, fill: 'F2F2F2' },
-    ...(penilaianItems.length === 0
-      ? [{ text: 'Belum diisi', colSpan: 12 }]
-      : penilaianItems.map((item): Cell => ({ text: `${item.item} : ${item.bobot}`, colSpan: 12 }))),
-  ])
-
-  // Pustaka
-  const pustakaUtamaLines = toLines(cellText({ html: c.pustaka_utama || '' }))
-  const pustakaPendukungLines = toLines(cellText({ html: c.pustaka_pendukung || '' }))
-  const pustakaRows = 2 + Math.max(pustakaUtamaLines.length, 1) + 2 + Math.max(pustakaPendukungLines.length, 1)
-  rows.push([
-    { text: 'Pustaka', colSpan: 2, rowSpan: pustakaRows, center: true, bold: true, fill: 'F2F2F2' },
-    { text: 'Utama :', colSpan: 2, bold: true },
-    { text: '', colSpan: 10 },
-  ])
-  if (pustakaUtamaLines.length === 0) {
-    rows.push([{ text: '', colSpan: 12 }])
-  } else {
-    pustakaUtamaLines.forEach(line => rows.push([{ text: line, colSpan: 12 }]))
-  }
-  rows.push([
-    { text: 'Pendukung :', colSpan: 2, bold: true },
-    { text: '', colSpan: 10 },
-  ])
-  if (pustakaPendukungLines.length === 0) {
-    rows.push([{ text: '', colSpan: 12 }])
-  } else {
-    pustakaPendukungLines.forEach(line => rows.push([{ text: line, colSpan: 12 }]))
-  }
-
-  // Dosen Pengampu & Matakuliah syarat
-  rows.push([
-    { text: 'Dosen Pengampu', colSpan: 2, bold: true, center: true, fill: 'F2F2F2' },
-    { text: c.dosen_pengampu || '', colSpan: 12 },
-  ])
-  rows.push([
-    { text: 'Matakuliah syarat', colSpan: 2, bold: true, center: true, fill: 'F2F2F2' },
-    { text: c.matakuliah_syarat || '', colSpan: 12 },
-  ])
-
-  return rows
-}
-
-function buildPertemuanRows(c: Record<string, string>): Row[] {
-  const items = parsePertemuan(c.pertemuan)
-  const rows: Row[] = []
-
-  // Header row 1 — mirrors the Excel→HTML reference (5 stacked header rows)
-  rows.push([
-    { text: 'No', rowSpan: 5, center: true, bold: true, fill: 'F2F2F2' },
-    { text: 'Kemampuan akhir tiap tahapan belajar', colSpan: 2, center: true, bold: true, fill: 'F2F2F2' },
-    { text: 'Penilaian', colSpan: 5, rowSpan: 4, center: true, bold: true, fill: 'F2F2F2' },
-    { text: 'Bentuk Pembelajaran,', colSpan: 3, center: true, bold: true, fill: 'F2F2F2' },
-    { text: 'Materi Pembelajaran', colSpan: 2, center: true, bold: true, fill: 'F2F2F2' },
-    { text: 'Bobot Penilaian (%)', rowSpan: 5, center: true, bold: true, fill: 'F2F2F2' },
-  ])
-  // Header row 2
-  rows.push([
-    { text: '(Sub-CPMK)', colSpan: 2, center: true, bold: true, fill: 'F2F2F2' },
-    { text: 'Metode Pembelajaran,', colSpan: 3, center: true, bold: true, fill: 'F2F2F2' },
-    { text: '[ Pustaka ]', colSpan: 2, center: true, bold: true, fill: 'F2F2F2' },
-  ])
-  // Header row 3
-  rows.push([
-    { text: '', colSpan: 2 },
-    { text: 'Penugasan Mahasiswa,', colSpan: 3, center: true, bold: true, fill: 'F2F2F2' },
-    { text: '', colSpan: 2 },
-  ])
-  // Header row 4
-  rows.push([
-    { text: '', colSpan: 2 },
-    { text: '[ Estimasi Waktu ]', colSpan: 3, center: true, bold: true, fill: 'F2F2F2' },
-    { text: '', colSpan: 2 },
-  ])
-  // Header row 5
-  rows.push([
-    { text: '', colSpan: 2 },
-    { text: 'Indikator', colSpan: 2, center: true, bold: true, fill: 'F2F2F2' },
-    { text: 'Kriteria & Teknik', colSpan: 3, center: true, bold: true, fill: 'F2F2F2' },
-    { text: 'Luring (offline)', center: true, bold: true, fill: 'F2F2F2' },
-    { text: 'Daring (online)', colSpan: 2, center: true, bold: true, fill: 'F2F2F2' },
-    { text: '', colSpan: 2 },
-  ])
-
-  if (items.length === 0) {
-    rows.push([{ text: 'Belum diisi', colSpan: TOTAL_COLS, center: true }])
-    return rows
-  }
-
-  items.forEach(item => {
-    if (item.type === 'uts' || item.type === 'uas') {
-      rows.push([{ text: item.label || '', colSpan: TOTAL_COLS, center: true, bold: true, fill: 'F2F2F2' }])
-      return
-    }
-    rows.push([
-      { text: String(item.no || ''), center: true },
-      { html: item.subCpmk || '', colSpan: 2 },
-      { html: item.indikator || '', colSpan: 2 },
-      { html: item.kriteriaTeknik || '', colSpan: 3 },
-      { html: item.luring || item.bentukMetodePenugasan || '', },
-      { html: item.daring || '', colSpan: 2 },
-      { html: item.materiPustaka || '', colSpan: 2 },
-      { text: item.bobot ? `${item.bobot}%` : '', center: true },
-    ])
-  })
-
-  return rows
-}
-
-function buildSignatureRows(c: Record<string, string>): Row[] {
-  const rows: Row[] = []
-  rows.push([
-    { text: 'Dibuat di Tempat,', colSpan: 7, size: 9 },
-    { text: 'Dibuat di Tempat,', colSpan: 7, size: 9 },
-  ])
-  rows.push([
-    { text: '', colSpan: 7 },
-    { text: '', colSpan: 7 },
-  ])
-  rows.push([
-    { text: `( ${c.pengembang_rps || '.................'} )`, colSpan: 7, center: true, bold: true, size: 10 },
-    { text: `( ${c.dosen_pengampu || '.................'} )`, colSpan: 7, center: true, bold: true, size: 10 },
-  ])
-  rows.push([
-    { text: `NIDN. ${c.nidn_pengembang || '...........'}`, colSpan: 7, center: true, size: 9 },
-    { text: `NIDN. ${c.nidn_pengembang || '...........'}`, colSpan: 7, center: true, size: 9 },
-  ])
-  rows.push([
-    { text: 'Pengembang RPS', colSpan: 7, center: true, size: 9 },
-    { text: 'Dosen Pengampu', colSpan: 7, center: true, size: 9 },
-  ])
-  rows.push([
-    { text: 'Mengetahui,', colSpan: 7, size: 9 },
-    { text: 'Mengetahui,', colSpan: 7, size: 9 },
-  ])
-  rows.push([
-    { text: '', colSpan: 7 },
-    { text: '', colSpan: 7 },
-  ])
-  rows.push([
-    { text: `( ${c.kaprodi || '.................'} )`, colSpan: 7, center: true, bold: true, size: 10 },
-    { text: `( ${c.wakil_ketua_i || '.................'} )`, colSpan: 7, center: true, bold: true, size: 10 },
-  ])
-  rows.push([
-    { text: `NIDN. ${c.nidn_kaprodi || '...........'}`, colSpan: 7, center: true, size: 9 },
-    { text: `NIDN. ${c.nidn_wakil_ketua_i || '...........'}`, colSpan: 7, center: true, size: 9 },
-  ])
-  rows.push([
-    { text: `Kaprodi ${c.prodi || 'S1 Farmasi'}`, colSpan: 7, center: true, size: 9 },
-    { text: 'Wakil Ketua I Bidang Akademik', colSpan: 7, center: true, size: 9 },
-  ])
-  rows.push([
-    { text: '', colSpan: 7 },
-    { text: '', colSpan: 7 },
-  ])
-  rows.push([
-    { text: `Mengetahui,\n( ${c.ketua_stikes || '.................'} )`, colSpan: 7, center: true, size: 9 },
-    { text: '', colSpan: 7 },
-  ])
-  rows.push([
-    { text: `NIDN. ${c.nidn_ketua_stikes || '...........'}`, colSpan: 7, center: true, size: 9 },
-    { text: '', colSpan: 7 },
-  ])
-  rows.push([
-    { text: 'Ketua STIKes Ibnu Sina Ajibarang', colSpan: 7, center: true, size: 9 },
-    { text: '', colSpan: 7 },
-  ])
-  return rows
-}
-
-// ── DOCX rendering ──
-
-const TABLE_BORDERS = {
-  top: { style: BorderStyle.SINGLE, size: 4, color: '000000' },
-  bottom: { style: BorderStyle.SINGLE, size: 4, color: '000000' },
-  left: { style: BorderStyle.SINGLE, size: 4, color: '000000' },
-  right: { style: BorderStyle.SINGLE, size: 4, color: '000000' },
-  insideHorizontal: { style: BorderStyle.SINGLE, size: 4, color: '000000' },
-  insideVertical: { style: BorderStyle.SINGLE, size: 4, color: '000000' },
-}
-
-function docxParagraphs(cell: Cell): Paragraph[] {
-  const lines = toLines(cellText(cell))
-  const size = cell.size ? Math.round(cell.size * 2) : 20 // half-points, default 10pt
-  if (lines.length === 0) {
-    return [new Paragraph({ children: [new TextRun({ text: '', size, font: 'Times New Roman' })], alignment: AlignmentType.LEFT })]
-  }
-  return lines.map(line =>
-    new Paragraph({
-      children: [new TextRun({ text: line, bold: cell.bold, size, font: 'Times New Roman' })],
-      alignment: cell.center ? AlignmentType.CENTER : AlignmentType.LEFT,
-      spacing: { after: 20, line: 240 },
-    })
-  )
-}
-
-function docxCell(cell: Cell): TableCell {
-  return new TableCell({
-    children: docxParagraphs(cell),
-    columnSpan: cell.colSpan,
-    rowSpan: cell.rowSpan,
-    verticalAlign: VerticalAlign.CENTER,
-    shading: cell.fill ? { type: ShadingType.CLEAR, fill: cell.fill } : undefined,
-    margins: { top: 40, bottom: 40, left: 80, right: 80 },
-  })
-}
-
-function docxTable(rows: Row[]): Table {
-  return new Table({
-    width: { size: 100, type: WidthType.PERCENTAGE },
-    borders: TABLE_BORDERS,
-    rows: rows.map(r => new TableRow({ children: r.map(docxCell) })),
-  })
-}
-
-function decodeLogoDataUrl(dataUrl: string): Uint8Array {
-  const b64 = dataUrl.split(',')[1] || ''
-  const bin = atob(b64)
-  const bytes = new Uint8Array(bin.length)
-  for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i)
-  return bytes
-}
+// ─────────────────────────── public export API ───────────────────────────
 
 export async function exportDocx(data: ExportData, filePath: string): Promise<void> {
   const startTime = Date.now()
   const c = data.content
   logger.info('EXPORT', 'export.docx_start')
-
-  const mainRows = buildMainRows(c)
-  const pertemuanRows = buildPertemuanRows(c)
-  const signatureRows = buildSignatureRows(c)
-
-  const doc = new Document({
-    styles: {
-      default: {
-        document: {
-          run: { font: 'Times New Roman', size: 20 },
-        },
-      },
-    },
-    sections: [{
-      properties: {
-        page: {
-          size: { orientation: PageOrientation.LANDSCAPE },
-          margin: { top: 720, bottom: 720, left: 720, right: 720 },
-        },
-      },
-      children: [
-        docxTableWithLogo(mainRows, decodeLogoDataUrl(logoDataUrl)),
-        new Paragraph({ spacing: { before: 40, after: 40 } }),
-        docxTable(pertemuanRows),
-        new Paragraph({ spacing: { before: 200 } }),
-        docxTable(signatureRows),
-      ],
-    }],
-  })
-
+  const doc = buildDocx(c)
   const buffer = await Packer.toBuffer(doc)
-  const uint8Array = new Uint8Array(buffer)
-  await window.electronAPI.writeFileToPath(filePath, uint8Array)
+  await window.electronAPI.writeFileToPath(filePath, new Uint8Array(buffer))
   const duration = ((Date.now() - startTime) / 1000).toFixed(1)
-  logger.info('EXPORT', 'export.docx_complete', { filePath, duration })
+  logger.info('EXPORT', 'export.docx_complete', { filePath, duration, bytes: buffer.byteLength })
 }
 
-function docxTableWithLogo(rows: Row[], logoBytes: Uint8Array): Table {
-  const first = rows[0]
-  const headerCell = new TableCell({
-    children: [
-      new Paragraph({
-        children: [new ImageRun({ type: 'png', data: logoBytes, transformation: { width: 40, height: 40 } })],
-        alignment: AlignmentType.CENTER,
-      }),
-    ],
-    columnSpan: 2,
-    rowSpan: 3,
-    verticalAlign: VerticalAlign.CENTER,
-    margins: { top: 40, bottom: 40, left: 80, right: 80 },
-  })
-  const allRows: TableRow[] = rows.map((r, idx) => {
-    if (idx === 0) {
-      const [_, ...rest] = r
-      return new TableRow({ children: [headerCell, ...rest.map(docxCell)] })
-    }
-    return new TableRow({ children: r.map(docxCell) })
-  })
-  return new Table({
-    width: { size: 100, type: WidthType.PERCENTAGE },
-    borders: TABLE_BORDERS,
-    rows: allRows,
-  })
-}
-
-// ── PDF rendering ──
-
-function pdfCell(cell: Cell): string {
-  const size = cell.size || 10
-  const style = [
-    'border:1px solid #000',
-    'padding:3px 5px',
-    `font-size:${size}pt`,
-    'font-family:Times New Roman, serif',
-    'vertical-align:top',
-    cell.center ? 'text-align:center' : 'text-align:left',
-    cell.fill ? `background:${cell.fill}` : '',
-  ].filter(Boolean).join(';')
-  const attrs = [
-    `style="${style}"`,
-    cell.colSpan ? `colspan="${cell.colSpan}"` : '',
-    cell.rowSpan ? `rowspan="${cell.rowSpan}"` : '',
-  ].filter(Boolean).join(' ')
-
-  let content: string
-  if (cell.html) {
-    content = `<div style="font-size:${size}pt;font-family:Times New Roman, serif;line-height:1.3;">${cell.html}</div>`
-  } else {
-    const lines = toLines(cell.text || '')
-    content = lines.length
-      ? lines.map(l => `<div style="font-size:${size}pt;font-family:Times New Roman, serif;line-height:1.3;">${escapeHtml(l)}</div>`).join('')
-      : '&nbsp;'
-  }
-  const strong = cell.bold ? `<strong>${content}</strong>` : content
-  return `<td ${attrs}>${strong}</td>`
-}
-
-function pdfTable(rows: Row[]): string {
-  return `<table style="width:100%;border-collapse:collapse;border:1px solid #000;">${rows.map(r => `<tr>${r.map(pdfCell).join('')}</tr>`).join('')}</table>`
-}
-
-function buildPdfHtml(c: Record<string, string>): string {
-  const main = buildMainRows(c)
-  // Inline logo as data URL (avoids file:// CORS issues in packaged apps)
-  main[0][0] = {
-    colSpan: 2,
-    rowSpan: 3,
-    center: true,
-    html: `<img src="${logoDataUrl}" style="width:70px;height:70px;object-fit:contain;" />`,
-  }
-  const pertemuan = buildPertemuanRows(c)
-  const signature = buildSignatureRows(c)
-
-  return `
-    <div style="width:100%;font-family:Times New Roman, serif;">
-      ${pdfTable(main)}
-      <div style="height:6px;"></div>
-      ${pdfTable(pertemuan)}
-      <div style="height:6px;"></div>
-      ${pdfTable(signature)}
-    </div>
-  `
-}
-
+/**
+ * PDF export — prints the exact Preview HTML via Electron printToPDF,
+ * guaranteeing preview == downloaded PDF.
+ */
 export async function exportPdf(data: ExportData, filePath: string): Promise<void> {
   const startTime = Date.now()
-  const c = data.content
   logger.info('EXPORT', 'export.pdf_start')
-
-  const html = buildPdfHtml(c)
-
-  const container = document.createElement('div')
-  container.innerHTML = html
-  container.style.position = 'absolute'
-  container.style.left = '-9999px'
-  container.style.top = '0'
-  container.style.width = '1122px' // A4 landscape @96dpi
-  document.body.appendChild(container)
-
-  try {
-    const worker = html2pdf()
-      .set({
-        margin: [8, 8, 8, 8],
-        image: { type: 'jpeg', quality: 0.98 },
-        html2canvas: { scale: 2, useCORS: true, backgroundColor: '#ffffff', windowWidth: 1122 },
-        jsPDF: { unit: 'mm', format: 'a4', orientation: 'landscape' },
-      })
-      .from(container)
-      .toContainer()
-      .toCanvas()
-      .toPdf()
-
-    const pdf = await worker.get('pdf')
-    const buffer = pdf.output('arraybuffer')
-    await window.electronAPI.writeFileToPath(filePath, new Uint8Array(buffer))
-    const duration = ((Date.now() - startTime) / 1000).toFixed(1)
-    logger.info('EXPORT', 'export.pdf_complete', { filePath, duration, bytes: buffer.byteLength })
-  } finally {
-    document.body.removeChild(container)
+  const html = buildRpsHtml(data.content)
+  const ok = await window.electronAPI.exportPdfHtml(filePath, html)
+  if (!ok) {
+    throw new Error('Gagal mencetak PDF di proses utama Electron.')
   }
+  const duration = ((Date.now() - startTime) / 1000).toFixed(1)
+  logger.info('EXPORT', 'export.pdf_complete', { filePath, duration })
 }

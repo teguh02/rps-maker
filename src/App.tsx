@@ -5,6 +5,7 @@ import { StartScreen } from './components/StartScreen'
 import { AISettingsDialog } from './components/AISettingsDialog'
 import { ImportDialog } from './components/ImportDialog'
 import { GuidePage, guideSections } from './components/GuidePage'
+import { PreviewPage } from './components/PreviewPage'
 import { exportDocx, exportPdf } from './services/export'
 import { logger } from './utils/logger'
 
@@ -87,10 +88,17 @@ function App() {
   const [showAISettings, setShowAISettings] = useState(false)
   const [showImport, setShowImport] = useState(false)
   const [activeGuide, setActiveGuide] = useState<string | null>(null)
+  const [showPreview, setShowPreview] = useState(false)
   const [autoSaveActive, setAutoSaveActive] = useState(false)
   const [lastAutoSaveAt, setLastAutoSaveAt] = useState<string | null>(null)
+  const [toast, setToast] = useState<{ message: string; type: 'info' | 'warning' | 'error' } | null>(null)
   const projectRef = useRef(project)
   const lastSavedContentRef = useRef<string>('')
+
+  const showToast = (message: string, type: 'info' | 'warning' | 'error' = 'warning') => {
+    setToast({ message, type })
+    setTimeout(() => setToast(null), 3000)
+  }
 
   // Keep a ref of the latest project so the auto-save interval always sees fresh data.
   useEffect(() => {
@@ -102,7 +110,9 @@ function App() {
     lastSavedContentRef.current = ''
     setAutoSaveActive(false)
     setLastAutoSaveAt(null)
-    setProject({ filePath: null, content: content || { ...defaultContent } })
+    // Always start from the full default schema so every section/field exists
+    // even when the caller only provides a partial object (e.g. just `prodi`).
+    setProject({ filePath: null, content: { ...defaultContent, ...(content || {}) } })
     setShowStart(false)
   }
 
@@ -124,7 +134,24 @@ function App() {
 
   const handleSaveProject = async () => {
     if (!project) return
-    logger.info('APP', 'project.save', { filePath: project.filePath || 'new' })
+    // Save exists already in memory (opened project) → write straight back to it,
+    // exactly like MS Word does when you Ctrl+S a .docx you opened.
+    if (projectRef.current?.filePath) {
+      logger.info('APP', 'project.save', { filePath: projectRef.current.filePath, via: 'existing-path' })
+      const ok = await handleSilentSave()
+      if (ok) {
+        setLastAutoSaveAt(new Date().toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit', second: '2-digit' }))
+        window.electronAPI.addRecent(projectRef.current.filePath)
+        loadRecentFiles()
+        showToast('Proyek berhasil disimpan.', 'info')
+      } else {
+        showToast('Gagal menyimpan ke file. Gunakan “Simpan Sebagai” untuk memilih lokasi lain.', 'error')
+      }
+      return
+    }
+
+    // No file path yet (new project) → ask where to save (Save As dialog).
+    logger.info('APP', 'project.save', { filePath: 'new' })
     const data = {
       defaultName: project.content.mata_kuliah
         ? `RPS_${project.content.mata_kuliah.replace(/\s+/g, '_')}.rps`
@@ -140,6 +167,7 @@ function App() {
       setLastAutoSaveAt(new Date().toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit', second: '2-digit' }))
       window.electronAPI.addRecent(savedPath)
       loadRecentFiles()
+      showToast('Proyek berhasil disimpan.', 'info')
     } else {
       logger.debug('APP', 'project.save_canceled')
     }
@@ -163,6 +191,7 @@ function App() {
       setLastAutoSaveAt(new Date().toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit', second: '2-digit' }))
       window.electronAPI.addRecent(savedPath)
       loadRecentFiles()
+      showToast('Proyek berhasil disimpan sebagai file baru.', 'info')
     } else {
       logger.debug('APP', 'project.save_as_canceled')
     }
@@ -198,9 +227,10 @@ function App() {
           await exportPdf({ content: project.content }, result.filePath)
         }
         logger.info('APP', 'project.export_complete', { format, filePath: result.filePath })
+        showToast(`Berhasil diekspor ke ${format.toUpperCase()}.`, 'info')
       } catch (err) {
         logger.error('APP', 'project.export_error', { format, error: (err as Error).message })
-        alert('Gagal export: ' + (err as Error).message)
+        showToast('Gagal export: ' + (err as Error).message, 'error')
       }
     } else {
       logger.debug('APP', 'project.export_canceled', { format })
@@ -233,8 +263,8 @@ function App() {
   handlersRef.current = { handleNewProject, handleSaveProject, handleSaveAs, handleOpenProject, handleExport }
 
   // Keep latest dialog state so the Esc key handler (registered once) never goes stale.
-  const uiRef = useRef({ showImport, showAISettings, activeGuide })
-  uiRef.current = { showImport, showAISettings, activeGuide }
+  const uiRef = useRef({ showImport, showAISettings, activeGuide, showPreview })
+  uiRef.current = { showImport, showAISettings, activeGuide, showPreview }
 
   useEffect(() => {
     loadRecentFiles()
@@ -248,11 +278,12 @@ function App() {
     const unsubImport = window.electronAPI.onMenuImport(() => setShowImport(true))
     const unsubAI = window.electronAPI.onOpenAISettings(() => setShowAISettings(true))
 
-    // Esc closes whichever dialog is on top (guide, import, then AI settings).
+    // Esc closes whichever view/dialog is on top (preview, guide, import, then AI settings).
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key !== 'Escape') return
       const ui = uiRef.current
-      if (ui.activeGuide) setActiveGuide(null)
+      if (ui.showPreview) setShowPreview(false)
+      else if (ui.activeGuide) setActiveGuide(null)
       else if (ui.showImport) setShowImport(false)
       else if (ui.showAISettings) setShowAISettings(false)
     }
@@ -270,15 +301,29 @@ function App() {
   }, [])
 
   // Auto-save: only active once the project has a real file path (saved manually first).
+  // Flushes on a timer AND whenever the window loses focus / becomes hidden so the
+  // latest edits are persisted even if the app is closed right after typing.
   useEffect(() => {
     if (!autoSaveActive) return
     logger.info('APP', 'project.auto_save_enabled')
     const interval = window.setInterval(() => {
       void handleSilentSave()
-    }, 15_000)
+    }, 8_000)
+    const flush = () => {
+      void handleSilentSave()
+    }
+    const onVisibility = () => {
+      if (document.visibilityState === 'hidden') flush()
+    }
+    window.addEventListener('blur', flush)
+    document.addEventListener('visibilitychange', onVisibility)
     // Flush once immediately after activation (covers changes made right before enabling)
     void handleSilentSave()
-    return () => window.clearInterval(interval)
+    return () => {
+      window.clearInterval(interval)
+      window.removeEventListener('blur', flush)
+      document.removeEventListener('visibilitychange', onVisibility)
+    }
   }, [autoSaveActive, handleSilentSave])
 
   if (showStart) {
@@ -292,6 +337,18 @@ function App() {
           await window.electronAPI.clearRecent()
           loadRecentFiles()
         }}
+      />
+    )
+  }
+
+  // Full-page document preview (View ribbon → Preview) — same HTML as the PDF export.
+  if (showPreview && project) {
+    return (
+      <PreviewPage
+        content={project.content}
+        onBack={() => setShowPreview(false)}
+        onExportWord={() => void handleExport('docx')}
+        onExportPdf={() => void handleExport('pdf')}
       />
     )
   }
@@ -312,8 +369,13 @@ function App() {
             setShowStart(true)
           }}
           onOpenGuide={(section) => setActiveGuide(section)}
+          onPreview={() => {
+            logger.info('APP', 'open_preview')
+            setShowPreview(true)
+          }}
           autoSaveActive={autoSaveActive}
           lastAutoSaveAt={lastAutoSaveAt}
+          showToast={showToast}
         />
       )}
       <AISettingsDialog open={showAISettings} onClose={() => setShowAISettings(false)} />
@@ -323,7 +385,20 @@ function App() {
           setProject({ ...project, content: { ...project.content, ...data } })
         }
         setShowStart(false)
+        showToast('Data kurikulum berhasil diimpor.', 'info')
       }} />
+
+      {/* Toast notification */}
+      {toast && (
+        <div className={`toast-notification toast-${toast.type}`}>
+          <span className="toast-icon">
+            {toast.type === 'info' && '✓'}
+            {toast.type === 'warning' && '⚠'}
+            {toast.type === 'error' && '✕'}
+          </span>
+          <span className="toast-message">{toast.message}</span>
+        </div>
+      )}
     </div>
   )
 }

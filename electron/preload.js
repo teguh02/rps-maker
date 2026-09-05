@@ -11,7 +11,10 @@ contextBridge.exposeInMainWorld('electronAPI', {
   addRecent: (filePath) => ipcRenderer.invoke('recent:add', filePath),
   clearRecent: () => ipcRenderer.invoke('recent:clear'),
   writeFileToPath: (filePath, buffer) => ipcRenderer.invoke('file:write', filePath, buffer),
+  exportPdfHtml: (filePath, html) => ipcRenderer.invoke('pdf:export-html', filePath, html),
   aiGenerate: (options) => ipcRenderer.invoke('ai:generate', options),
+  toggleFullscreen: () => ipcRenderer.invoke('window:toggle-fullscreen'),
+  isFullscreen: () => ipcRenderer.invoke('window:is-fullscreen'),
 
   onMenuNew: (callback) => { ipcRenderer.on('menu-new', callback); return () => ipcRenderer.removeListener('menu-new', callback); },
   onMenuOpen: (callback) => { ipcRenderer.on('menu-open', callback); return () => ipcRenderer.removeListener('menu-open', callback); },

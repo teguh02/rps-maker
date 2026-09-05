@@ -17,8 +17,10 @@ declare global {
     aiGenerate: (options: { apiHost: string; apiKey: string; model: string; systemPrompt: string; userPrompt: string }) => Promise<{ ok: boolean; content?: string; error?: string }>
 
     onMenuNew: (callback: () => void) => () => void
+    onMenuOpen: (callback: () => void) => () => void
     onMenuSave: (callback: () => void) => () => void
-    onMenuExport: (callback: () => void) => () => void
+    onMenuSaveAs: (callback: () => void) => () => void
+    onMenuExport: (callback: (format?: string) => void) => () => void
     onMenuImport: (callback: () => void) => () => void
     onOpenAISettings: (callback: () => void) => () => void
 

@@ -26,6 +26,7 @@ interface RibbonProps {
   onZoomIn?: () => void
   onZoomOut?: () => void
   onZoomReset?: () => void
+  onShowShortcuts?: () => void
   activeSection?: string
   onGenerateAI?: () => void
   aiLoading?: boolean
@@ -61,7 +62,7 @@ const FONT_SIZES = ['8pt', '9pt', '10pt', '11pt', '12pt', '14pt', '16pt', '18pt'
 export function Ribbon({
   onSave, onExport, onOpenAISettings, onGoHome, activeSection, onGenerateAI, aiLoading,
   onCut, onCopy, onPaste, onUndo, onRedo, canUndo, canRedo,
-  onZoomIn, onZoomOut, onZoomReset,
+  onZoomIn, onZoomOut, onZoomReset, onShowShortcuts,
 }: RibbonProps) {
   const [activeTab, setActiveTab] = useState<TabId>('home')
   const [showContent, setShowContent] = useState(true)
@@ -207,7 +208,7 @@ export function Ribbon({
 
         {activeTab === 'help' && (
           <RibbonGroup label="Support">
-            <RibbonButton icon={<KeyboardIcon size={20} />} label="Shortcuts" onClick={() => {}} />
+            <RibbonButton icon={<KeyboardIcon size={20} />} label="Shortcuts" onClick={onShowShortcuts} />
             <RibbonButton icon={<InfoIcon size={20} />} label="About" onClick={() => {}} />
           </RibbonGroup>
         )}

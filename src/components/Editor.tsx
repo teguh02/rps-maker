@@ -1,7 +1,8 @@
-import { useState } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import type { Project } from '../App'
 import { Ribbon } from './Ribbon'
 import { RTE } from './RTE'
+import { ShortcutsDialog } from './ShortcutsDialog'
 import { guideSections } from './GuidePage'
 import { ArrowUpIcon, ArrowDownIcon, TrashIcon } from './icons'
 import { isAIConfigured, generateWithAI, getSectionPrompt } from '../services/ai'
@@ -65,6 +66,7 @@ export function Editor({ project, onUpdate, onSave, onExport, onOpenAISettings, 
   const [currentContent, setCurrentContent] = useState<string>(JSON.stringify(project.content))
   const [toast, setToast] = useState<{ message: string; type: 'info' | 'warning' | 'error' } | null>(null)
   const [contextMenu, setContextMenu] = useState<{ x: number; y: number } | null>(null)
+  const [showShortcuts, setShowShortcuts] = useState(false)
 
   const showToast = (message: string, type: 'info' | 'warning' | 'error' = 'warning') => {
     setToast({ message, type })
@@ -157,6 +159,83 @@ export function Editor({ project, onUpdate, onSave, onExport, onOpenAISettings, 
   const handleZoomReset = () => {
     setZoom(1);
   };
+
+  // Latest-handler refs so the one-time keyboard listener below never uses stale closures.
+  const shortcutsRef = useRef({
+    activeSection,
+    handleUndo,
+    handleRedo,
+    handleZoomIn,
+    handleZoomOut,
+    handleZoomReset,
+    onOpenGuide,
+    closeOverlays: () => {
+      setContextMenu(null)
+      setShowShortcuts(false)
+    },
+  })
+  shortcutsRef.current = {
+    activeSection,
+    handleUndo,
+    handleRedo,
+    handleZoomIn,
+    handleZoomOut,
+    handleZoomReset,
+    onOpenGuide,
+    closeOverlays: shortcutsRef.current.closeOverlays,
+  }
+
+  useEffect(() => {
+    const onKeyDown = (e: KeyboardEvent) => {
+      const s = shortcutsRef.current
+      // F1 → open the guide for the active section
+      if (e.key === 'F1') {
+        e.preventDefault()
+        s.onOpenGuide?.(s.activeSection)
+        return
+      }
+      // Esc → close context menu / shortcuts dialog
+      if (e.key === 'Escape') {
+        s.closeOverlays()
+        return
+      }
+      const mod = e.ctrlKey || e.metaKey
+      if (!mod) return
+      const key = e.key.toLowerCase()
+      // Zoom keys (safe anywhere, no field is focused on them)
+      if (key === '0') { e.preventDefault(); s.handleZoomReset(); return }
+      if (key === '=' || key === '+') { e.preventDefault(); s.handleZoomIn(); return }
+      if (key === '-') { e.preventDefault(); s.handleZoomOut(); return }
+      // Document Undo/Redo — only when focus is NOT inside an editable field.
+      // (Inside an RTE or input, the field itself handles Ctrl+Z natively.)
+      const el = document.activeElement as HTMLElement | null
+      const inEditable = !!el && (el.isContentEditable || ['INPUT', 'TEXTAREA', 'SELECT'].includes(el.tagName))
+      if (key === 'z' && !inEditable) {
+        e.preventDefault()
+        if (e.shiftKey) s.handleRedo()
+        else s.handleUndo()
+        return
+      }
+      if (key === 'y' && !inEditable) {
+        e.preventDefault()
+        s.handleRedo()
+        return
+      }
+    }
+    const onWheel = (e: WheelEvent) => {
+      if (!e.ctrlKey) return
+      e.preventDefault()
+      const s = shortcutsRef.current
+      if (e.deltaY < 0) s.handleZoomIn()
+      else s.handleZoomOut()
+    }
+    window.addEventListener('keydown', onKeyDown)
+    window.addEventListener('wheel', onWheel, { passive: false })
+    return () => {
+      window.removeEventListener('keydown', onKeyDown)
+      window.removeEventListener('wheel', onWheel)
+    }
+  }, [])
 
   const updateField = (key: string, value: string) => {
     logger.debug('EDITOR', 'editor.field_update', { field: key })
@@ -568,6 +647,7 @@ export function Editor({ project, onUpdate, onSave, onExport, onOpenAISettings, 
         onZoomIn={handleZoomIn}
         onZoomOut={handleZoomOut}
         onZoomReset={handleZoomReset}
+        onShowShortcuts={() => setShowShortcuts(true)}
       />
 
       <div className="flex-1 overflow-y-auto bg-[#e8e8e8] flex flex-col items-center">
@@ -1078,6 +1158,9 @@ export function Editor({ project, onUpdate, onSave, onExport, onOpenAISettings, 
           <span className="toast-message">{toast.message}</span>
         </div>
       )}
+
+      {/* Keyboard shortcuts reference */}
+      <ShortcutsDialog open={showShortcuts} onClose={() => setShowShortcuts(false)} />
     </div>
   )
 }

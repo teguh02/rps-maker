@@ -229,29 +229,39 @@ function App() {
   }
 
   // Keep latest handler references so the one-time listener effect below never uses stale closures.
-  const handlersRef = useRef({ handleNewProject, handleSaveProject, handleSaveAs, handleExport })
-  handlersRef.current = { handleNewProject, handleSaveProject, handleSaveAs, handleExport }
+  const handlersRef = useRef({ handleNewProject, handleSaveProject, handleSaveAs, handleOpenProject, handleExport })
+  handlersRef.current = { handleNewProject, handleSaveProject, handleSaveAs, handleOpenProject, handleExport }
+
+  // Keep latest dialog state so the Esc key handler (registered once) never goes stale.
+  const uiRef = useRef({ showImport, showAISettings, activeGuide })
+  uiRef.current = { showImport, showAISettings, activeGuide }
 
   useEffect(() => {
     loadRecentFiles()
 
+    // Menu-accelerator events (app-scoped, sent from the hidden application menu).
     const unsubNew = window.electronAPI.onMenuNew(() => handlersRef.current.handleNewProject())
+    const unsubOpen = window.electronAPI.onMenuOpen(() => void handlersRef.current.handleOpenProject())
     const unsubSave = window.electronAPI.onMenuSave(() => handlersRef.current.handleSaveProject())
-    const unsubExport = window.electronAPI.onMenuExport(() => handlersRef.current.handleExport())
+    const unsubSaveAs = window.electronAPI.onMenuSaveAs(() => handlersRef.current.handleSaveAs())
+    const unsubExport = window.electronAPI.onMenuExport((format) => handlersRef.current.handleExport((format as 'pdf' | 'docx') || 'pdf'))
     const unsubImport = window.electronAPI.onMenuImport(() => setShowImport(true))
     const unsubAI = window.electronAPI.onOpenAISettings(() => setShowAISettings(true))
 
+    // Esc closes whichever dialog is on top (guide, import, then AI settings).
     const handleKeyDown = (e: KeyboardEvent) => {
-      if ((e.ctrlKey || e.metaKey) && e.key === 's') {
-        e.preventDefault()
-        if (e.shiftKey) handlersRef.current.handleSaveAs()
-        else handlersRef.current.handleSaveProject()
-      }
+      if (e.key !== 'Escape') return
+      const ui = uiRef.current
+      if (ui.activeGuide) setActiveGuide(null)
+      else if (ui.showImport) setShowImport(false)
+      else if (ui.showAISettings) setShowAISettings(false)
     }
     window.addEventListener('keydown', handleKeyDown)
     return () => {
       unsubNew()
+      unsubOpen()
       unsubSave()
+      unsubSaveAs()
       unsubExport()
       unsubImport()
       unsubAI()

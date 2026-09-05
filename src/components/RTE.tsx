@@ -69,6 +69,17 @@ function RTEInner({ content, onUpdate, placeholder, compact }: RTEProps) {
         if (hasFiles || hasImage) {
           return true
         }
+        // Ctrl/Cmd+Shift+V → paste as plain text (strip all formatting/marks).
+        // Chromium exposes the keyboard modifier on the paste event (not in the TS DOM lib).
+        if ((event as ClipboardEvent & { shiftKey?: boolean }).shiftKey === true) {
+          const text = event.clipboardData?.getData('text/plain') || ''
+          if (text) {
+            const { state } = view
+            const { from, to } = state.selection
+            view.dispatch(state.tr.replaceWith(from, to, state.schema.text(text)))
+          }
+          return true
+        }
         return false
       },
       handleDrop: (view, event) => {

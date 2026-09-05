@@ -14,8 +14,10 @@ contextBridge.exposeInMainWorld('electronAPI', {
   aiGenerate: (options) => ipcRenderer.invoke('ai:generate', options),
 
   onMenuNew: (callback) => { ipcRenderer.on('menu-new', callback); return () => ipcRenderer.removeListener('menu-new', callback); },
+  onMenuOpen: (callback) => { ipcRenderer.on('menu-open', callback); return () => ipcRenderer.removeListener('menu-open', callback); },
   onMenuSave: (callback) => { ipcRenderer.on('menu-save', callback); return () => ipcRenderer.removeListener('menu-save', callback); },
-  onMenuExport: (callback) => { ipcRenderer.on('menu-export', callback); return () => ipcRenderer.removeListener('menu-export', callback); },
+  onMenuSaveAs: (callback) => { ipcRenderer.on('menu-save-as', callback); return () => ipcRenderer.removeListener('menu-save-as', callback); },
+  onMenuExport: (callback) => { const listener = (_e, format) => callback(format); ipcRenderer.on('menu-export', listener); return () => ipcRenderer.removeListener('menu-export', listener); },
   onMenuImport: (callback) => { ipcRenderer.on('menu-import', callback); return () => ipcRenderer.removeListener('menu-import', callback); },
   onOpenAISettings: (callback) => { ipcRenderer.on('open-ai-settings', callback); return () => ipcRenderer.removeListener('open-ai-settings', callback); },
 

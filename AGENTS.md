@@ -74,6 +74,14 @@
 - **Undo/Redo**: Whole-document history stack (up to 50 states)
 - **Zoom**: CSS `transform: scale()`, range 25%-400%
 
+### Keyboard Shortcuts
+- **Registration**: Hidden application menu (`Menu.setApplicationMenu` in `main.js`) — accelerators fire only while the app is focused (replaced `globalShortcut`, which was system-wide and consumed keys). Menu bar stays hidden (`setMenuBarVisibility(false)`).
+- **File**: `Ctrl+N` new, `Ctrl+O` open, `Ctrl+S` save, `Ctrl+Shift+S` save as, `Ctrl+E` export dialog, `Ctrl+P` export PDF, `Ctrl+Shift+E` export Word, `Ctrl+Shift+I` import
+- **Document editing** (window keydown in `Editor.tsx`): `Ctrl+Z`/`Ctrl+Y`/`Ctrl+Shift+Z` undo/redo **only when focus is outside an editable field** (inside an RTE/input the field's native undo wins); `F1` opens the guide for the active section; `Esc` closes context menu/shortcuts dialog; zoom `Ctrl+0` reset, `Ctrl+=` in, `Ctrl+-` out, `Ctrl+wheel` zoom
+- **In-editor (TipTap built-ins)**: `Ctrl+B/I/U`, `Ctrl+Shift+X` strikethrough, `Ctrl+Shift+7/8` lists, `Ctrl+Shift+V` paste-as-plain-text (RTE `handlePaste` shiftKey branch)
+- **Dialogs**: `Esc` closes guide → import → AI settings (App-level keydown)
+- **Reference UI**: `ShortcutsDialog.tsx` (Help ribbon → Shortcuts button)
+
 ### Guide System
 - **GuidePage.tsx**: Detailed guide pages with screenshots
 - **guideData**: Each section has title, description, image

@@ -1,4 +1,4 @@
-const { app, BrowserWindow, ipcMain, dialog, globalShortcut, nativeImage } = require('electron');
+const { app, BrowserWindow, ipcMain, dialog, nativeImage, Menu } = require('electron');
 const path = require('path');
 const fs = require('fs');
 const JSZip = require('jszip');
@@ -351,31 +351,50 @@ ipcMain.handle('ai:generate', async (_, { apiHost, apiKey, model, systemPrompt, 
   }
 });
 
+// Send an event to the renderer only while the window exists.
+function sendToRenderer(event, ...args) {
+  if (mainWindow && !mainWindow.isDestroyed()) {
+    mainWindow.webContents.send(event, ...args);
+  }
+}
+
+function buildAppMenu() {
+  const isMac = process.platform === 'darwin';
+  const template = [
+    ...(isMac ? [{ role: 'appMenu' }] : []),
+    {
+      label: 'File',
+      submenu: [
+        { label: 'New Project', accelerator: 'CommandOrControl+N', click: () => sendToRenderer('menu-new') },
+        { label: 'Open Project...', accelerator: 'CommandOrControl+O', click: () => sendToRenderer('menu-open') },
+        { type: 'separator' },
+        { label: 'Save', accelerator: 'CommandOrControl+S', click: () => sendToRenderer('menu-save') },
+        { label: 'Save As...', accelerator: 'CommandOrControl+Shift+S', click: () => sendToRenderer('menu-save-as') },
+        { type: 'separator' },
+        { label: 'Import Kurikulum...', accelerator: 'CommandOrControl+Shift+I', click: () => sendToRenderer('menu-import') },
+        { type: 'separator' },
+        { label: 'Export Word...', accelerator: 'CommandOrControl+Shift+E', click: () => sendToRenderer('menu-export', 'docx') },
+        { label: 'Export PDF...', accelerator: 'CommandOrControl+P', click: () => sendToRenderer('menu-export', 'pdf') },
+        { label: 'Export...', accelerator: 'CommandOrControl+E', click: () => sendToRenderer('menu-export') },
+        { type: 'separator' },
+        isMac ? { role: 'close' } : { role: 'quit', label: 'Exit' },
+      ],
+    },
+  ];
+  return Menu.buildFromTemplate(template);
+}
+
 app.whenReady().then(() => {
   createWindow();
 
-  const shortcuts = [
-    ['CommandOrControl+N', 'menu-new'],
-    ['CommandOrControl+O', 'menu-open'],
-    ['CommandOrControl+S', 'menu-save'],
-    ['CommandOrControl+Shift+S', 'menu-save-as'],
-    ['CommandOrControl+E', 'menu-export'],
-  ];
-
-  shortcuts.forEach(([accelerator, event]) => {
-    const registered = globalShortcut.register(accelerator, () => {
-      if (mainWindow) mainWindow.webContents.send(event);
-    });
-    if (registered) {
-      log.info('APP', 'shortcut_registered', { accelerator, event });
-    } else {
-      log.error('APP', 'shortcut_register_fail', { accelerator });
-    }
-  });
+  // Hidden application menu: accelerators work only while this app is focused
+  // (unlike globalShortcut which was system-wide). The menu bar stays hidden
+  // because the app uses its own ribbon UI.
+  Menu.setApplicationMenu(buildAppMenu());
+  log.info('APP', 'menu_installed', { platform: process.platform });
 });
 
 app.on('window-all-closed', () => {
-  globalShortcut.unregisterAll();
   if (process.platform !== 'darwin') app.quit();
 });
 

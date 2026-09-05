@@ -458,7 +458,8 @@ export async function exportDocx(data: ExportData, filePath: string): Promise<vo
   const c = data.content
   logger.info('EXPORT', 'export.docx_start')
   const doc = buildDocx(c)
-  const buffer = await Packer.toBuffer(doc)
+  const blob = await Packer.toBlob(doc)
+  const buffer = await blob.arrayBuffer()
   await window.electronAPI.writeFileToPath(filePath, new Uint8Array(buffer))
   logger.info('EXPORT', 'export.docx_complete', { size: buffer.byteLength })
   const duration = ((Date.now() - startTime) / 1000).toFixed(1)

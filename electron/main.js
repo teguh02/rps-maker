@@ -305,7 +305,7 @@ ipcMain.handle('pdf:export-html', async (event, filePath, html) => {
   let pdfBuffer;
   try {
     const tmpWin = new BrowserWindow({
-      width: 297, height: 208, show: false,
+      width: 1200, height: 900, show: false,
       webPreferences: {
         webSecurity: false,
         nodeIntegration: false,
@@ -318,7 +318,7 @@ ipcMain.handle('pdf:export-html', async (event, filePath, html) => {
         tmpWin.once('did-finish-load', resolve);
         tmpWin.once('did-fail-load', (e) => reject(new Error('load-failed: ' + (e.error?.message ?? e.error ?? 'unknown'))));
         tmpWin.loadFile(tmpHtmlPath);
-        setTimeout(() => reject(new Error('load-timeout')), 8000);
+        setTimeout(() => reject(new Error('load-timeout')), 20000);
       });
       pdfBuffer = await tmpWin.printToPDF({ preferCSSPageSize: true });
     } finally {

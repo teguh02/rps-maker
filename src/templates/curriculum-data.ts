@@ -21,6 +21,11 @@ export interface ProdiData {
   nama: string
   kode: string
   jenjang: string
+  kaprodi: string
+  nidnKaprodi: string
+  ketuaStikes: string
+  nidnKetuaStikes: string
+  cplProdi: string[]       // CPL umum prodi (union dari semua MK)
   mataKuliah: MataKuliahData[]
 }
 
@@ -29,6 +34,17 @@ export const prodiData: ProdiData[] = [
     nama: 'S1 Farmasi',
     kode: 'FARM-S1',
     jenjang: 'S1',
+    kaprodi: 'Dr. Apt. Endang Dwiyati, M.Si',
+    nidnKaprodi: '0421068701',
+    ketuaStikes: 'Dr. H. Abdul Azis, S.KM., M.Kes',
+    nidnKetuaStikes: '0430096002',
+    cplProdi: [
+      'CPL 1: Mahasiswa mampu memanfaatkan teknologi informasi serta mengintegrasikan ilmu dasar, ilmu kefarmasian, ilmu humaniora, dan kesehatan masyarakat guna mengembangkan dan menerapkan ilmu pengetahuan, teknologi, dan/atau seni guna memajukan kesejahteraan nasional dan menjadi warga dunia yang bertanggung jawab.',
+      'CPL 2: Mahasiswa mampu mengimplementasikan konsep pengembangan, penjaminan mutu, dan pengujian kualitas sediaan farmasi, alat kesehatan, serta perbekalan kesehatan rumah tangga yang aman, berkhasiat, bermutu, dan terjangkau.',
+      'CPL 3: Mahasiswa mampu menganalisis dan mengelola informasi obat serta memberikan layanan informasi obat yang tepat guna dan bertanggung jawab.',
+      'CPL 4: Mahasiswa mampu mengidentifikasi dan menganalisis masalah kefarmasian serta merumuskan solusi berbasis bukti ilmiah.',
+      'CPL 7: Mahasiswa mampu mengaplikasikan konsep dan metode penelitian ilmiah di bidang farmasi, baik dalam konteks laboratorium maupun lapangan, serta melakukan penelitian yang dapat memberikan kontribusi bagi pengembangan ilmu pengetahuan dan teknologi kefarmasian.'
+    ],
     mataKuliah: [
       {
         kode: 'SF433',
@@ -227,6 +243,15 @@ export const prodiData: ProdiData[] = [
     nama: 'D3 Analis Farmasi dan Makanan',
     kode: 'ANAF-D3',
     jenjang: 'D3',
+    kaprodi: 'Apt. Nuryani, M.Farm',
+    nidnKaprodi: '0427078901',
+    ketuaStikes: 'Dr. H. Abdul Azis, S.KM., M.Kes',
+    nidnKetuaStikes: '0430096002',
+    cplProdi: [
+      'CPL 1: Mahasiswa mampu menerapkan pengetahuan dasar analisis dan teknik fisikokimia dalam pengujian sediaan farmasi.',
+      'CPL 2: Mahasiswa mampu melakukan pengukuran parameter fisikokimia sesuai standar prosedur operasional.',
+      'CPL 3: Mahasiswa mampu menganalisis dan melaporkan data pengujian fisikokimia dengan benar dan objektif.'
+    ],
     mataKuliah: [
       {
         kode: 'TIK221',
@@ -461,5 +486,58 @@ export function getPreloadedTemplate(prodiKode: string, mkKode: string): Record<
     wakil_ketua_i: '',
     nidn_wakil_ketua_i: '',
     pertemuan: '[]',
+  }
+}
+
+// ─────────────────────────── Prodi defaults ───────────────────────────
+
+function getCurrentAcademicYear(): string {
+  const now = new Date()
+  const month = now.getMonth() + 1 // 1-12
+  const year = now.getFullYear()
+  // Ganjil: Jul-Dec, Genap: Jan-Jun
+  if (month >= 7) return `${year}-${year + 1}`
+  return `${year - 1}-${year}`
+}
+
+function getCurrentSemester(): string {
+  const month = new Date().getMonth() + 1
+  return month >= 7 ? 'Ganjil' : 'Genap'
+}
+
+function getTodayDate(): string {
+  const now = new Date()
+  const y = now.getFullYear()
+  const m = String(now.getMonth() + 1).padStart(2, '0')
+  const d = String(now.getDate()).padStart(2, '0')
+  return `${y}-${m}-${d}`
+}
+
+/** Return a full content record pre-filled with Prodi defaults (no MK data). */
+export function getDefaultContentForProdi(prodiKode: string): Record<string, string> {
+  const prodi = prodiData.find(p => p.kode === prodiKode)
+  const base = getDefaultTemplate()
+
+  // Override user overrides from localStorage (if set)
+  const overrideKaprodi = localStorage.getItem('rps-kaprodi-override') || ''
+  const overrideKetuaStikes = localStorage.getItem('rps-ketua-stikes-override') || ''
+
+  // CPL prodi → StructuredList format
+  const cplItems = (prodi?.cplProdi || []).map((c, idx) => {
+    const match = c.match(/^CPL\s*\d+:\s*(.+)/)
+    return { label: `CPL-${idx + 1}`, deskripsi: match ? match[1] : c }
+  })
+
+  return {
+    ...base,
+    prodi: prodi?.nama || '',
+    semester_akademik: getCurrentAcademicYear(),
+    semester: getCurrentSemester(),
+    tgl_penyusunan: getTodayDate(),
+    kaprodi: overrideKaprodi || prodi?.kaprodi || '',
+    nidn_kaprodi: prodi?.nidnKaprodi || '',
+    ketua_stikes: overrideKetuaStikes || prodi?.ketuaStikes || '',
+    nidn_ketua_stikes: prodi?.nidnKetuaStikes || '',
+    cpl: JSON.stringify(cplItems),
   }
 }

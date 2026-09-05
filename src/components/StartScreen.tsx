@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
-import { prodiData, getPreloadedTemplate } from '../templates/curriculum-data'
-import { GraduationCapIcon, FileIcon, FolderOpenIcon, ClockIcon, PlusIcon, ChevronRightIcon, DownloadIcon, XIcon } from './icons'
+import { prodiData, getPreloadedTemplate, getDefaultContentForProdi } from '../templates/curriculum-data'
+import { GraduationCapIcon, FileIcon, FolderOpenIcon, ClockIcon, PlusIcon, ChevronRightIcon, DownloadIcon, XIcon, SettingsIcon } from './icons'
+import { SettingsModal } from './SettingsModal'
 
 // Real version from package.json — injected by Vite at build time (__APP_VERSION__).
 const APP_VERSION: string = typeof __APP_VERSION__ !== 'undefined' ? __APP_VERSION__ : ''
@@ -33,6 +34,7 @@ export function StartScreen({ onNew, onOpen, recentFiles, onOpenRecent, onClearR
   const [selectedMK, setSelectedMK] = useState('')
   const [update, setUpdate] = useState<UpdateState>({ phase: 'idle' })
   const [updateError, setUpdateError] = useState('')
+  const [showSettings, setShowSettings] = useState(false)
 
   // Auto-detect a newer release from GitHub when the start screen opens.
   useEffect(() => {
@@ -92,12 +94,19 @@ export function StartScreen({ onNew, onOpen, recentFiles, onOpenRecent, onClearR
 
   const handleCreateNew = () => {
     if (selectedProdi && selectedMK) {
+      // MK selected → pre-fill from curriculum
       const content = getPreloadedTemplate(selectedProdi, selectedMK)
       onNew(content)
       return
     }
-    // Blank project (merged over the app defaults in App.tsx); prefill prodi if chosen.
-    onNew(selectedProdiData ? { prodi: selectedProdiData.nama } : undefined)
+    if (selectedProdi) {
+      // Prodi only → pre-fill identity fields, leave MK-specific empty
+      const content = getDefaultContentForProdi(selectedProdi)
+      onNew(content)
+      return
+    }
+    // No Prodi → blank project
+    onNew()
   }
 
   const formatDate = (iso: string) => {
@@ -202,6 +211,13 @@ export function StartScreen({ onNew, onOpen, recentFiles, onOpenRecent, onClearR
                   <h2 className="ss-card-title">Project Baru</h2>
                   <p className="ss-card-sub">Mulai dari template kurikulum atau dokumen kosong</p>
                 </div>
+                <button
+                  className="ss-settings-btn"
+                  onClick={() => setShowSettings(true)}
+                  title="Pengaturan default"
+                >
+                  <SettingsIcon size={16} />
+                </button>
               </div>
 
               <div className="ss-card-body">
@@ -328,6 +344,8 @@ export function StartScreen({ onNew, onOpen, recentFiles, onOpenRecent, onClearR
           <p className="ss-footer">v{APP_VERSION || '1.0.0'} — Dibuat untuk Dosen UNISINA · S1 Farmasi &amp; D3 Anafarma</p>
         </div>
       </div>
+
+      <SettingsModal open={showSettings} onClose={() => setShowSettings(false)} />
     </div>
   )
 }

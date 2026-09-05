@@ -297,38 +297,31 @@ ipcMain.handle('pdf:export-html', async (event, filePath, html) => {
     log.debug('IPC', 'pdf:export-html_renamed_ext', { filePath: finalPath });
   }
 
-  const tmpDir = path.join(app.getPath('temp'), `rps-pdf-${Date.now()}`);
-  const tmpHtmlPath = path.join(tmpDir, 'index.html');
-  if (!fs.existsSync(tmpDir)) fs.mkdirSync(tmpDir, { recursive: true });
-  fs.writeFileSync(tmpHtmlPath, html, 'utf-8');
-
   let pdfBuffer;
+  const tmpWin = new BrowserWindow({
+    width: 1200, height: 900, show: false,
+    webPreferences: {
+      webSecurity: false,
+      nodeIntegration: false,
+      contextIsolation: true,
+    },
+  });
   try {
-    const tmpWin = new BrowserWindow({
-      width: 1200, height: 900, show: false,
-      webPreferences: {
-        webSecurity: false,
-        nodeIntegration: false,
-        contextIsolation: true,
-        preload: path.join(__dirname, 'preload.js'),
-      },
+    // Encode HTML as data URI to avoid file path issues
+    const dataUri = 'data:text/html;charset=utf-8,' + encodeURIComponent(html);
+    await new Promise((resolve, reject) => {
+      tmpWin.once('did-finish-load', resolve);
+      tmpWin.once('did-fail-load', (_e, code, desc) => reject(new Error(`load-failed ${code}: ${desc}`)));
+      tmpWin.loadURL(dataUri);
+      setTimeout(() => reject(new Error('load-timeout')), 30000);
     });
-    try {
-      await new Promise((resolve, reject) => {
-        tmpWin.once('did-finish-load', resolve);
-        tmpWin.once('did-fail-load', (e) => reject(new Error('load-failed: ' + (e.error?.message ?? e.error ?? 'unknown'))));
-        tmpWin.loadFile(tmpHtmlPath);
-        setTimeout(() => reject(new Error('load-timeout')), 20000);
-      });
-      pdfBuffer = await tmpWin.printToPDF({ preferCSSPageSize: true });
-    } finally {
-      tmpWin.destroy();
-    }
+    log.debug('IPC', 'pdf:export-html_loaded');
+    pdfBuffer = await tmpWin.printToPDF({ landscape: true, preferCSSPageSize: true });
   } catch (e) {
     log.error('IPC', 'pdf:export-html_print_failed', { error: e instanceof Error ? e.message : String(e) });
     throw e;
   } finally {
-    if (fs.existsSync(tmpDir)) fs.rmSync(tmpDir, { recursive: true, force: true });
+    tmpWin.destroy();
   }
 
   fs.writeFileSync(finalPath, pdfBuffer);

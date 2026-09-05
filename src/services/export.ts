@@ -430,7 +430,7 @@ function buildDocx(c: Record<string, string>): Document {
     creator: 'RPS Maker UNISINA',
     title: `RPS ${mk}`,
     styles: { default: { document: { run: { font: FONT_TWIPS, size: 21 } } } },
-    sections: [{ properties: {}, children }],
+    sections: [{ properties: { page: { size: { orientation: 'landscape' } } }, children }],
   })
 }
 

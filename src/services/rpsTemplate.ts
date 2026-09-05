@@ -13,7 +13,7 @@ xmlns="http://www.w3.org/TR/REC-html40">
 <head>
 <meta http-equiv=Content-Type content="text/html; charset=utf-8">
 <style>
-@page { margin: .75in .7in .75in .7in; }
+@page { size: A4 landscape; margin: .75in .7in .75in .7in; }
 table { border-collapse: collapse; }
 body { font-family: 'Times New Roman', Times, serif; font-size: 11pt; }
 </style>

@@ -283,42 +283,57 @@ ipcMain.handle('recent:clear', () => {
 // Print an HTML document (the exact Preview HTML) to a PDF file using Chromium's
 // own print engine. This is far more reliable than html2canvas + jsPDF.
 ipcMain.handle('pdf:export-html', async (event, filePath, html) => {
-  if (typeof filePath !== 'string' || typeof html !== 'string') {
+  log.info('IPC', 'pdf:export-html');
+  if (!filePath || typeof html !== 'string') {
     log.error('IPC', 'pdf:export-html_bad_args', { filePath, hasHtml: typeof html === 'string' });
     return false;
   }
-  let tmpFile = null;
-  let win = null;
-  try {
-    tmpFile = path.join(app.getPath('temp'), `rps-print-${Date.now()}.html`);
-    fs.writeFileSync(tmpFile, html, 'utf-8');
 
-    win = new BrowserWindow({
-      show: false,
-      width: 794,
-      height: 1123,
-      webPreferences: { offscreen: false, sandbox: true, contextIsolation: true },
-    });
-    await win.loadFile(tmpFile);
-    // Let the layout/type settle before printing.
-    await new Promise((resolve) => setTimeout(resolve, 400));
-
-    const pdfBuffer = await win.webContents.printToPDF({
-      printBackground: true,
-      preferCSSPageSize: true,
-    });
-    fs.writeFileSync(filePath, pdfBuffer);
-    log.info('IPC', 'pdf:export-html_done', { filePath, bytes: pdfBuffer.byteLength });
-    return true;
-  } catch (err) {
-    log.error('IPC', 'pdf:export-html_error', { filePath, error: err.message });
-    return false;
-  } finally {
-    if (win && !win.isDestroyed()) win.destroy();
-    if (tmpFile) {
-      try { fs.unlinkSync(tmpFile); } catch (e) { /* ignore */ }
-    }
+  let finalPath = filePath;
+  const lower = filePath.toLowerCase();
+  if (!lower.endsWith('.pdf')) {
+    const idx = lower.lastIndexOf('.');
+    finalPath = idx >= 0 ? filePath.substring(0, idx) + '.pdf' : filePath + '.pdf';
+    log.debug('IPC', 'pdf:export-html_renamed_ext', { filePath: finalPath });
   }
+
+  const tmpDir = path.join(app.getPath('temp'), `rps-pdf-${Date.now()}`);
+  const tmpHtmlPath = path.join(tmpDir, 'index.html');
+  if (!fs.existsSync(tmpDir)) fs.mkdirSync(tmpDir, { recursive: true });
+  fs.writeFileSync(tmpHtmlPath, html, 'utf-8');
+
+  let pdfBuffer;
+  try {
+    const tmpWin = new BrowserWindow({
+      width: 297, height: 208, show: false,
+      webPreferences: {
+        webSecurity: false,
+        nodeIntegration: false,
+        contextIsolation: true,
+        preload: path.join(__dirname, 'preload.js'),
+      },
+    });
+    try {
+      await new Promise((resolve, reject) => {
+        tmpWin.once('did-finish-load', resolve);
+        tmpWin.once('did-fail-load', (e) => reject(new Error('load-failed: ' + (e.error?.message ?? e.error ?? 'unknown'))));
+        tmpWin.loadFile(tmpHtmlPath);
+        setTimeout(() => reject(new Error('load-timeout')), 8000);
+      });
+      pdfBuffer = await tmpWin.printToPDF({ preferCSSPageSize: true });
+    } finally {
+      tmpWin.destroy();
+    }
+  } catch (e) {
+    log.error('IPC', 'pdf:export-html_print_failed', { error: e instanceof Error ? e.message : String(e) });
+    throw e;
+  } finally {
+    if (fs.existsSync(tmpDir)) fs.rmSync(tmpDir, { recursive: true, force: true });
+  }
+
+  fs.writeFileSync(finalPath, pdfBuffer);
+  log.info('IPC', 'pdf:export-html_done', { filePath: finalPath, bytes: pdfBuffer.byteLength });
+  return true;
 });
 
 ipcMain.handle('ai:generate', async (_, { apiHost, apiKey, model, systemPrompt, userPrompt }) => {

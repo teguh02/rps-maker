@@ -314,24 +314,31 @@ function buildDocx(c: Record<string, string>): Document {
   children.push(new Paragraph({ children: [new PageBreak()] }))
   children.push(heading('JADWAL PELAKSANAAN PEMBELAJARAN / PERTEMUAN', 26, 0, 160))
 
+  // 14-column layout matching the Excel RPS reference
   const ptmHeaders = [
-    { h: 'No', w: 5 },
-    { h: 'Kemampuan Akhir Tiap Tahapan Belajar (Sub-CPMK)', w: 14 },
-    { h: 'Indikator', w: 12 },
-    { h: 'Kriteria & Teknik', w: 13 },
-    { h: 'Bentuk Pembelajaran, Metode Pembelajaran, Penugasan Mahasiswa, [Estimasi Waktu]', w: 18 },
-    { h: 'Luring (offline)', w: 10 },
-    { h: 'Daring (online)', w: 10 },
-    { h: 'Materi Pembelajaran [Pustaka]', w: 13 },
-    { h: 'Bobot (%)', w: 5 },
+    { h: 'No', w: 3 },
+    { h: 'Kemampuan Akhir Tiap Tahapan Belajar (Sub-CPMK)', w: 10 },
+    { h: 'Indikator', w: 8 },
+    { h: 'Kriteria & Teknik', w: 9 },
+    { h: 'Bentuk Pembelajaran', w: 10 },
+    { h: 'Metode Pembelajaran', w: 10 },
+    { h: 'Penugasan Mahasiswa', w: 10 },
+    { h: 'Estimasi Waktu', w: 8 },
+    { h: 'Luring (offline)', w: 7 },
+    { h: 'Daring (online)', w: 7 },
+    { h: 'Materi Pembelajaran [Pustaka]', w: 10 },
+    { h: 'Bobot (%)', w: 3 },
   ]
   const ptmRows: TableRow[] = []
-  ptmRows.push(tableRow(ptmHeaders.map(h => textCell(h.h, { bold: true, center: true, size: 16, fill: 'F1F5F9', widthPct: h.w }))))
+
+  // Row 1: main headers
+  ptmRows.push(tableRow(ptmHeaders.map(h => textCell(h.h, { bold: true, center: true, size: 14, fill: 'F1F5F9', widthPct: h.w }))))
+
   const pertemuan = parsePertemuan(c.pertemuan)
   if (pertemuan.length === 0) {
     ptmRows.push(new TableRow({
       children: [new TableCell({
-        columnSpan: 9,
+        columnSpan: 12,
         borders: cellBorders,
         children: [new Paragraph({
           alignment: AlignmentType.CENTER,
@@ -344,7 +351,7 @@ function buildDocx(c: Record<string, string>): Document {
       if (r.type === 'uts' || r.type === 'uas') {
         ptmRows.push(new TableRow({
           children: [new TableCell({
-            columnSpan: 9,
+            columnSpan: 12,
             borders: cellBorders,
             shading: { type: ShadingType.CLEAR, fill: 'E8EDF5' },
             children: [new Paragraph({
@@ -356,15 +363,18 @@ function buildDocx(c: Record<string, string>): Document {
         return
       }
       ptmRows.push(tableRow([
-        textCell(String(r.no ?? ''), { center: true, size: 16, widthPct: 5 }),
-        richCell(r.subCpmk || '', { size: 16, widthPct: 14 }),
-        richCell(r.indikator || '', { size: 16, widthPct: 12 }),
-        richCell(r.kriteriaTeknik || '', { size: 16, widthPct: 13 }),
-        richCell(r.bentukMetodePenugasan || '', { size: 16, widthPct: 18 }),
-        richCell(r.luring || '', { size: 16, widthPct: 10 }),
-        richCell(r.daring || '', { size: 16, widthPct: 10 }),
-        richCell(r.materiPustaka || '', { size: 16, widthPct: 13 }),
-        textCell(String(r.bobot || 0), { center: true, size: 16, widthPct: 5 }),
+        textCell(String(r.no ?? ''), { center: true, size: 14, widthPct: 3 }),
+        richCell(r.subCpmk || '', { size: 14, widthPct: 10 }),
+        richCell(r.indikator || '', { size: 14, widthPct: 8 }),
+        richCell(r.kriteriaTeknik || '', { size: 14, widthPct: 9 }),
+        richCell(r.bentukMetodePenugasan || '', { size: 14, widthPct: 10 }),
+        textCell('', { size: 14, widthPct: 10 }), // Metode
+        textCell('', { size: 14, widthPct: 10 }), // Penugasan
+        textCell('', { size: 14, widthPct: 8 }), // Estimasi
+        richCell(r.luring || '', { size: 14, widthPct: 7 }),
+        richCell(r.daring || '', { size: 14, widthPct: 7 }),
+        richCell(r.materiPustaka || '', { size: 14, widthPct: 10 }),
+        textCell(String(r.bobot || 0), { center: true, size: 14, widthPct: 3 }),
       ]))
     })
   }
@@ -448,7 +458,7 @@ export async function exportDocx(data: ExportData, filePath: string): Promise<vo
   const c = data.content
   logger.info('EXPORT', 'export.docx_start')
   const doc = buildDocx(c)
-  const buffer: ArrayBuffer = await Packer.toBuffer(doc)
+  const buffer = await Packer.toBuffer(doc)
   await window.electronAPI.writeFileToPath(filePath, new Uint8Array(buffer))
   logger.info('EXPORT', 'export.docx_complete', { size: buffer.byteLength })
   const duration = ((Date.now() - startTime) / 1000).toFixed(1)

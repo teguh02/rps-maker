@@ -1111,6 +1111,14 @@ export function Editor({ project, onUpdate, onSave, onExport, onOpenAISettings, 
                           compact
                         />
                       </td>
+                      <td className="border p-1">
+                        <RTE
+                          content={item.luring}
+                          onUpdate={(html) => pertCellRef.current(idx, 'luring', html)}
+                          placeholder="Luring"
+                          compact
+                        />
+                      </td>
                       <td colSpan={3} className="border p-1">
                         <RTE
                           content={item.daring}

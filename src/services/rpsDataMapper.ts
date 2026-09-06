@@ -56,10 +56,10 @@ function buildCapaian(c: Record<string, string>): string {
 
   const makeRows = (items: StructuredItem[], emptyText: string) => {
     if (items.length === 0) {
-      return `<tr><td colspan="13" style="border-right:1pt solid black;border-bottom:1pt solid black;color:#999;">${emptyText}</td></tr>`
+      return `<tr><td colspan="12" style="border-right:1pt solid black;border-bottom:1pt solid black;color:#999;">${emptyText}</td></tr>`
     }
     return items.map(it =>
-      `<tr><td style="border-right:1pt solid black;border-bottom:1pt solid black;">${esc(it.label || '')}</td><td colspan="12" style="border-right:1pt solid black;border-bottom:1pt solid black;">${sanitizeRich(it.deskripsi || '')}</td></tr>`
+      `<tr><td style="border-right:1pt solid black;border-bottom:1pt solid black;">${esc(it.label || '')}</td><td colspan="11" style="border-right:1pt solid black;border-bottom:1pt solid black;">${sanitizeRich(it.deskripsi || '')}</td></tr>`
     ).join('\n')
   }
 
@@ -161,62 +161,52 @@ function buildPustaka(c: Record<string, string>): string {
 function buildPertemuan(c: Record<string, string>): string {
   const rows = parseJson<PertemuanRow>(c.pertemuan)
 
-  // 14-column header matching reference exactly
-  const header = `
-<!-- Pertemuan Header (5 rows, 14 cols) -->
-<tr>
-  <td rowspan="5" style="border:1pt solid black;font-weight:bold;text-align:center;vertical-align:middle;">No</td>
-  <td colspan="2" rowspan="4" style="border:1pt solid black;font-weight:bold;text-align:center;vertical-align:middle;">Kemampuan<br>akhir tiap<br>tahapan<br>belajar<br>(Sub-CPMK)</td>
-  <td colspan="5" rowspan="2" style="border:1pt solid black;font-weight:bold;text-align:center;vertical-align:middle;">Penilaian</td>
-  <td colspan="3" rowspan="4" style="border:1pt solid black;font-weight:bold;text-align:center;vertical-align:middle;">Bentuk<br>Pembelajaran,<br>Metode<br>Pembelajaran,<br>Penugasan<br>Mahasiswa,<br>[ Estimasi Waktu]</td>
-  <td colspan="2" rowspan="4" style="border:1pt solid black;font-weight:bold;text-align:center;vertical-align:middle;">Materi<br>Pembelajaran<br>[ Pustaka ]</td>
-  <td rowspan="5" style="border:1pt solid black;font-weight:bold;text-align:center;vertical-align:middle;">Bobot<br>Penilaian<br>(%)</td>
-</tr>
-<tr>
-  <td colspan="2" rowspan="2" style="border:1pt solid black;font-weight:bold;text-align:center;vertical-align:middle;">Indikator</td>
-  <td colspan="3" rowspan="2" style="border:1pt solid black;font-weight:bold;text-align:center;vertical-align:middle;">Kriteria &amp;<br>Teknik</td>
-</tr>
-<tr>
-</tr>
-<tr>
-  <td style="border:1pt solid black;font-weight:bold;text-align:center;">Luring<br>(offline)</td>
-  <td colspan="2" style="border:1pt solid black;font-weight:bold;text-align:center;">Daring<br>(online)</td>
-</tr>
-<tr>
-  <td colspan="2" style="border:1pt solid black;">&nbsp;</td>
-  <td colspan="2" style="border:1pt solid black;font-weight:bold;text-align:center;">Indikator</td>
-  <td colspan="3" style="border:1pt solid black;font-weight:bold;text-align:center;">Kriteria &amp; Teknik</td>
-  <td style="border:1pt solid black;font-weight:bold;text-align:center;">Luring<br>(offline)</td>
-  <td colspan="2" style="border:1pt solid black;font-weight:bold;text-align:center;">Daring<br>(online)</td>
-  <td colspan="2" style="border:1pt solid black;font-weight:bold;text-align:center;">Materi<br>[ Pustaka ]</td>
+  const emptyRow = `<tr>
+  <td class="center">&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td><td class="center">&nbsp;</td>
 </tr>`
 
+  let body = ''
   if (rows.length === 0) {
-    return header + `
-<tr>
-  <td colspan="14" style="border:1pt solid black;text-align:center;color:#999;">Belum ada jadwal pertemuan. Gunakan "Generate dari Sub-CPMK" di tab Pertemuan.</td>
+    body = `<tr><td colspan="8" style="text-align:center;color:#999;border:1pt solid black;">Belum ada jadwal pertemuan. Gunakan "Generate dari Sub-CPMK" di tab Pertemuan.</td></tr>`
+  } else {
+    body = rows.map(r => {
+      if (r.type === 'uts' || r.type === 'uas') {
+        return `<tr><td colspan="8" style="text-align:center;font-weight:bold;background:#f0f0f0;border:1pt solid black;">${esc(r.label || (r.type === 'uts' ? 'UTS (UJIAN TENGAH SEMESTER)' : 'Evaluasi Akhir Semester'))}</td></tr>`
+      }
+      return `<tr>
+  <td class="center">${r.no ?? ''}</td>
+  <td>${sanitizeRich(r.subCpmk || '')}</td>
+  <td>${sanitizeRich(r.indikator || '')}</td>
+  <td>${sanitizeRich(r.kriteriaTeknik || '')}</td>
+  <td>${sanitizeRich(r.luring || '')}</td>
+  <td>${sanitizeRich(r.daring || '')}</td>
+  <td>${sanitizeRich(r.materiPustaka || '')}</td>
+  <td class="center">${r.bobot || 0}</td>
 </tr>`
+    }).join('\n')
   }
 
-  const body = rows.map(r => {
-    if (r.type === 'uts' || r.type === 'uas') {
-      return `<tr>
-  <td colspan="14" style="border:1pt solid black;text-align:center;font-weight:bold;background:#f0f0f0;">${esc(r.label || (r.type === 'uts' ? 'UTS (UJIAN TENGAH SEMESTER)' : 'Evaluasi Akhir Semester'))}</td>
-</tr>`
-    }
-    return `<tr>
-  <td rowspan="5" style="border:1pt solid black;text-align:center;vertical-align:top;">${r.no ?? ''}</td>
-  <td colspan="2" rowspan="5" style="border:1pt solid black;vertical-align:top;">${sanitizeRich(r.subCpmk || '')}</td>
-  <td colspan="2" rowspan="5" style="border:1pt solid black;vertical-align:top;">${sanitizeRich(r.indikator || '')}</td>
-  <td colspan="3" rowspan="5" style="border:1pt solid black;vertical-align:top;">${sanitizeRich(r.kriteriaTeknik || '')}</td>
-  <td rowspan="5" style="border:1pt solid black;vertical-align:top;">${sanitizeRich(r.luring || '')}</td>
-  <td colspan="2" rowspan="5" style="border:1pt solid black;vertical-align:top;">${sanitizeRich(r.daring || '')}</td>
-  <td colspan="2" rowspan="5" style="border:1pt solid black;vertical-align:top;">${sanitizeRich(r.materiPustaka || '')}</td>
-  <td rowspan="5" style="border:1pt solid black;text-align:center;vertical-align:top;">${r.bobot || 0}</td>
-</tr>`
-  }).join('\n')
-
-  return header + '\n' + body
+  return `<table>
+  <thead>
+    <tr>
+      <th rowspan="2">No</th>
+      <th rowspan="2">Kemampuan akhir tiap tahapan belajar<br>(Sub-CPMK)</th>
+      <th colspan="2">Penilaian</th>
+      <th colspan="2">Bentuk Pembelajaran, Metode Pembelajaran,<br>Penugasan Mahasiswa, [Estimasi Waktu]</th>
+      <th rowspan="2">Materi Pembelajaran<br>[ Pustaka ]</th>
+      <th rowspan="2">Bobot Penilaian (%)</th>
+    </tr>
+    <tr>
+      <th>Indikator</th>
+      <th>Kriteria &amp; Teknik</th>
+      <th>Luring (offline)</th>
+      <th>Daring (online)</th>
+    </tr>
+  </thead>
+  <tbody>
+    ${body}
+  </tbody>
+</table>`
 }
 
 // ─────────────────────────── public API ───────────────────────────

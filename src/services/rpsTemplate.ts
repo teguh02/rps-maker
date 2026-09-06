@@ -14,8 +14,7 @@ export function getRpsTemplate(): string {
 @page { size: A4 landscape; margin: 1.5cm; }
 @page cover { size: A4 portrait; margin: 2cm; }
 @page signature { size: A4 landscape; margin: 1.5cm; }
-body { font-family: 'Times New Roman', Times, serif; font-size: 11pt; margin: 0; padding: 0; color: #000; }
-table { border-collapse: collapse; width: 100%; }
+body { font-family: 'Times New Roman', Times, serif; font-size: 11pt; margin: 0; padding: 16px 24px; color: #000; width: 100%; }
 td, th { vertical-align: middle; }
 
 /* ── Cover Page ── */
@@ -31,19 +30,15 @@ td, th { vertical-align: middle; }
 .cover .bulan { font-size: 12pt; margin: 10pt 0 0 0; }
 
 /* ── Content Pages ── */
-.content { page: content; }
-.content table { border-collapse: collapse; }
-.content td { border: 1pt solid black; padding: 2pt 4pt; font-size: 10pt; }
-.content .hdr-logo { width: 96pt; }
-.content .hdr-text { font-weight: bold; text-align: center; }
-.content .hdr-sm { font-size: 9pt; text-align: center; }
-.content .bold { font-weight: bold; }
+.content { width: 100%; }
+.content table { border-collapse: collapse; width: 100%; table-layout: fixed; }
+.content td { border: 1pt solid black; padding: 2pt 4pt; font-size: 10pt; word-wrap: break-word; overflow-wrap: break-word; }
+.content th { border: 1pt solid black; padding: 4pt 6pt; font-size: 10pt; font-weight: bold; text-align: center; background: #f0f0f0; vertical-align: middle; }
 .content .center { text-align: center; }
-.content .top { vertical-align: top; }
 
 /* ── Signature Page ── */
-.signature { page: signature; page-break-before: always; }
-.signature table { border-collapse: collapse; }
+.signature { page-break-before: always; width: 100%; }
+.signature table { border-collapse: collapse; width: 100%; }
 .signature td { padding: 2pt 4pt; font-size: 10pt; vertical-align: top; }
 </style>
 </head>
@@ -66,8 +61,8 @@ td, th { vertical-align: middle; }
 
 <!-- CONTENT PAGES -->
 <div class="content">
-<table border="1" cellpadding="0" cellspacing="0" width="100%" style="border-collapse:collapse;border:none;">
-<col width="48"><col width="48"><col width="48"><col width="48"><col width="48"><col width="48"><col width="48"><col width="48"><col width="48"><col width="48"><col width="48"><col width="48"><col width="48"><col width="48">
+<table border="1" cellpadding="0" cellspacing="0" width="100%" style="border-collapse:collapse;border:none;table-layout:fixed;">
+<col style="width:7.14%"><col style="width:7.14%"><col style="width:7.14%"><col style="width:7.14%"><col style="width:7.14%"><col style="width:7.14%"><col style="width:7.14%"><col style="width:7.14%"><col style="width:7.14%"><col style="width:7.14%"><col style="width:7.14%"><col style="width:7.14%"><col style="width:7.14%"><col style="width:7.14%">
 
 <!-- Row 1-3: Header Block -->
 <tr>
@@ -151,10 +146,12 @@ td, th { vertical-align: middle; }
   <td colspan="12" style="border-right:1pt solid black;border-bottom:1pt solid black;">{{matakuliah_syarat}}</td>
 </tr>
 
-<!-- Pertemuan Section -->
-{{pertemuan_section}}
-
 </table>
+</div>
+
+<!-- PERTEMUAN TABLE (separate, 8 columns) -->
+<div class="content">
+{{pertemuan_section}}
 </div>
 
 <!-- SIGNATURE PAGE -->

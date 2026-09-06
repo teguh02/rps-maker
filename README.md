@@ -4,7 +4,7 @@ Aplikasi desktop lintas platform untuk membantu dosen **Universitas Ibnu Sina Aj
 
 ## Demo
 
-<iframe src="https://drive.google.com/file/d/1ARwT5sauSD9VR2DccSjXDGeLZSbQNCE9/preview" width="640" height="480" allow="autoplay"></iframe>
+![RPS Maker UNISINA](docs/demo.gif)
 
 ## Fitur Utama
 

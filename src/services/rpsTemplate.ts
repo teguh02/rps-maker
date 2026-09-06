@@ -156,6 +156,7 @@ td, th { vertical-align: middle; }
 <div class="content">
 {{pertemuan_section}}
 </div>
+<br>
 
 <!-- SIGNATURE PAGE -->
 <div class="signature">
@@ -210,7 +211,7 @@ td, th { vertical-align: middle; }
       <b>{{ketua_stikes}}</b><br>NIDN. {{nidn_ketua_stikes}}
     </td>
     <td class="center" style="border-top:none;">
-      <b>{{wakil_ketua_1}}</b><br>NIDN. {{nidn_wakil_ketua_1}}
+      <b>{{wakil_ketua_i}}</b><br>NIDN. {{nidn_wakil_ketua_i}}
     </td>
   </tr>
 </table>

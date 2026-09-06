@@ -1053,13 +1053,14 @@ export function Editor({ project, onUpdate, onSave, onExport, onOpenAISettings, 
                   <th rowSpan={2} className="border p-2 w-10">No</th>
                   <th colSpan={2} rowSpan={2} className="border p-2 w-40">Kemampuan Akhir (Sub-CPMK)</th>
                   <th colSpan={6} className="border p-2 w-72">Penilaian</th>
-                  <th colSpan={4} className="border p-2 w-56">Bentuk Pembelajaran, Metode Pembelajaran, Penugasan Mahasiswa, [Estimasi Waktu]</th>
+                  <th colSpan={5} className="border p-2 w-56">Bentuk Pembelajaran, Metode Pembelajaran, Penugasan Mahasiswa, [Estimasi Waktu]</th>
                   <th colSpan={2} rowSpan={2} className="border p-2 w-40">Materi [Pustaka]</th>
                   <th rowSpan={2} className="border p-2 w-16">Bobot</th>
                 </tr>
                 <tr className="bg-gray-100">
                   <th colSpan={2} className="border p-2">Indikator</th>
                   <th colSpan={4} className="border p-2">Kriteria & Teknik</th>
+                  <th className="border p-2">Bentuk</th>
                   <th className="border p-2">Luring</th>
                   <th colSpan={3} className="border p-2">Daring</th>
                 </tr>
@@ -1069,7 +1070,7 @@ export function Editor({ project, onUpdate, onSave, onExport, onOpenAISettings, 
                   if (row.type === 'uts' || row.type === 'uas') {
                     return (
                       <tr key={idx} className="bg-gray-50">
-                        <td className="border p-2 text-center text-gray-500" colSpan={14}>
+                        <td className="border p-2 text-center text-gray-500" colSpan={17}>
                           <strong>{row.label}</strong>
                         </td>
                       </tr>

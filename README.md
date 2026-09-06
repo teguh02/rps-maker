@@ -1,45 +1,95 @@
 # RPS Maker UNISINA
 
-Word processor khusus Rencana Pembelajaran Semester (RPS) untuk Dosen UNISINA.
+Aplikasi desktop lintas platform untuk membantu dosen **Universitas Ibnu Sina Ajibarang** menyusun dokumen Rencana Pembelajaran Semester (RPS) secara efisien dan terstruktur.
 
-## Fitur
+## Demo
 
-- **Editor WYSIWYG** — Seperti MS Word, langsung edit RPS
-- **Template Preloaded** — CPL, CPMK, dan referensi dari kurikulum S1 Farmasi & D3 Anafarma
-- **Project File (.rps)** — Simpan dan buka project kapan saja
-- **Export DOCX & PDF** — Download dalam format Word atau PDF
-- **AI Integration** — Generate CPMK, metode, asesmen, dan referensi via AI (OpenAI-compatible)
-- **Import Kurikulum** — Import data dari file CSV
-- **Tooltips & Panduan** — Penjelasan istilah akademik di tiap section
-- **Keyboard Shortcuts** — Ctrl+S save, Ctrl+Shift+S save as
-- **Cross-platform** — Windows, Linux, macOS
+<iframe src="https://drive.google.com/file/d/1ARwT5sauSD9VR2DccSjXDGeLZSbQNCE9/preview" width="640" height="480" allow="autoplay"></iframe>
 
-## Development
+## Fitur Utama
 
-```bash
-npm install
-npm run dev
-```
-
-## Build
-
-```bash
-npm run build           # Build React + Electron
-npm run dist:win        # Package Windows
-npm run dist:linux      # Package Linux
-npm run dist:mac        # Package macOS
-```
+- **WYSIWYG Editor** — Pengisian RPS langsung pada tabel seperti Excel, dengan dukungan bold, italic, underline, dan list
+- **Template Lengkap** — Cover, Identitas, Otorisasi, CPL/CPMK/Sub-CPMK, Deskripsi, Bahan Kajian, Penilaian, Pustaka, Pertemuan, dan Pengesahan
+- **Preload Kurikulum** — Data CPL, CPMK, Sub-CPMK, dan materi sudah terisi otomatis untuk mata kuliah S1 Farmasi dan D3 Anafarma
+- **Bantuan AI** — Integrasi AI untuk membantu menyusun capaian pembelajaran, indikator, dan materi perkuliahan
+- **Export PDF & Word** — Dokumen RPS dapat diunduh dalam format PDF atau DOCX
+- **Import dari Excel/CSV** — Impor data RPS dari file CSV
+- **Auto-save** — Perubahan tersimpan otomatis secara berkala
+- **Undo/Redo** — Dukungan undo/redo hingga 50 langkah
+- **Zoom** — Perbesar/perkecil tampilan dari 25% hingga 400%
+- **Pengaturan Global** — Data diri pengguna, Kaprodi, dan Ketua STIKes bisa diatur sekali dan otomatis terisi di project baru
 
 ## Tech Stack
 
-- Electron 30+
-- React 18 + TypeScript
-- Vite
-- Tailwind CSS
-- TipTap (Rich Text Editor)
-- docx (Word export)
-- html2pdf.js (PDF export)
-- JSZip (Project file format)
+- **Electron 44+** — Desktop runtime
+- **React 18 + TypeScript** — UI framework
+- **Vite 8** — Build tool
+- **Tailwind CSS 4** — Styling
+- **TipTap** — Rich text editor
+- **docx** — Export ke Word
+- **html2pdf.js** — Export ke PDF
+
+## Instalasi
+
+```bash
+# Clone repository
+git clone https://github.com/teguh02/rps-maker.git
+cd rps-maker
+
+# Install dependencies
+npm install
+
+# Jalankan development mode
+npm run dev
+
+# Build untuk produksi
+npm run build
+
+# Build installer Windows
+npm run dist:win
+```
+
+## Struktur Project
+
+```
+├── electron/           # Electron main process
+│   ├── main.js         # IPC handlers, PDF export, auto-update
+│   └── preload.js      # Preload scripts
+├── src/
+│   ├── components/     # React components
+│   │   ├── Editor.tsx          # Main editor dengan semua section RPS
+│   │   ├── Ribbon.tsx          # Toolbar Office 365 style
+│   │   ├── StructuredList.tsx  # Komponen tabel baris (CPL, CPMK, dll)
+│   │   ├── RTE.tsx             # TipTap rich text editor wrapper
+│   │   ├── PreviewPage.tsx     # Preview RPS
+│   │   └── GuidePage.tsx       # Panduan lengkap
+│   ├── services/
+│   │   ├── ai.ts               # Integrasi AI (OpenRouter / custom)
+│   │   ├── export.ts           # Export DOCX + PDF
+│   │   ├── rpsTemplate.ts      # HTML template RPS
+│   │   └── rpsDataMapper.ts    # Pengisian template dengan data
+│   └── templates/
+│       └── curriculum-data.ts   # Data kurikulum UNISINA
+├── public/
+│   └── guides/         # Gambar panduan
+└── referensi/          # Dokumen referensi RPS (tidak di-include di build)
+```
+
+## Target Pengguna
+
+Aplikasi ini dikhususkan untuk dosen **UNISINA** (Universitas Ibnu Sina Ajibarang):
+- **S1 Farmasi**
+- **D3 Analis Farmasi dan Makanan**
+
+## Open Source
+
+Proyek ini bersifat **open source** dan terbuka bagi siapa saja untuk ikut serta mengembangkan, memperbaiki, atau menyesuaikan dengan kebutuhan institusi masing-masing.
+
+## Developer
+
+**Teguh Rijanandi**
+- Email: teguhrijanandi02@gmail.com
+- GitHub: [teguh02](https://github.com/teguh02)
 
 ## License
 

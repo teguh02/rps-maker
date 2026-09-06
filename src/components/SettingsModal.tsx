@@ -17,7 +17,7 @@ export function SettingsModal({ open, onClose }: SettingsModalProps) {
   useEffect(() => {
     if (open) {
       setKaprodi(localStorage.getItem(STORAGE_KEY_KAPRODI) || '')
-      setKetuaStikes(localStorage.getItem(STORAGE_KEY_KETUA) || '')
+      setKetuaStikes(localStorage.getItem(STORAGE_KEY_KETUA) || 'apt. Adi Susanto, M.Farm')
       setSaved(false)
     }
   }, [open])

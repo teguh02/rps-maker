@@ -215,9 +215,11 @@ function App() {
     if (!project) return
     logger.info('APP', 'project.export', { format })
     const ext = format === 'pdf' ? 'pdf' : 'docx'
-    const name = project.content.mata_kuliah
-      ? `RPS_${project.content.mata_kuliah.replace(/\s+/g, '_')}.${ext}`
-      : `export.${ext}`
+    const mk = project.content.mata_kuliah || ''
+    const sem = project.content.semester || ''
+    const ta = project.content.semester_akademik || ''
+    const parts = [mk, sem, ta].filter(Boolean).join('_').replace(/\s+/g, '_')
+    const name = parts ? `RPS_${parts}.${ext}` : `export.${ext}`
     const result = await window.electronAPI.exportFile({ format, defaultName: name })
     if (result) {
       try {

@@ -237,13 +237,14 @@ ipcMain.handle('project:load', async (_, filePath) => {
   };
 });
 
-ipcMain.handle('dialog:export', async (_, { format }) => {
-  log.info('IPC', 'dialog:export', { format });
+ipcMain.handle('dialog:export', async (_, { format, defaultName }) => {
+  log.info('IPC', 'dialog:export', { format, defaultName });
   const filters = {
     pdf: [{ name: 'PDF Files', extensions: ['pdf'] }],
     docx: [{ name: 'Word Documents', extensions: ['docx'] }],
   };
   const result = await dialog.showSaveDialog(mainWindow, {
+    defaultPath: defaultName || `export.${format}`,
     filters: filters[format] || [{ name: 'All Files', extensions: ['*'] }],
   });
   if (result.canceled || !result.filePath) {

@@ -23,9 +23,11 @@ import {
   ShadingType,
   BorderStyle,
   PageBreak,
+  ImageRun,
 } from 'docx'
 import { logger } from '../utils/logger'
 import { buildRpsHtml, fullDate } from './rpsDocument'
+import logoUrl from '../assets/logo-unisina.png?url'
 
 export interface ExportData {
   content: Record<string, string>
@@ -201,7 +203,7 @@ function prodiCode(c: Record<string, string>): string {
  *  - Dosen Pengampu
  *  - Matakuliah Syarat
  */
-function buildContentTable(c: Record<string, string>): Table {
+function buildContentTable(c: Record<string, string>, logoData: Uint8Array | null): Table {
   const sksT = (c.sks_t || '0').trim()
   const sksP = (c.sks_p || '0').trim()
   const ta = c.semester_akademik || ''
@@ -211,10 +213,24 @@ function buildContentTable(c: Record<string, string>): Table {
   const W = [7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7] // 14 × 7.14 ≈ 100
   const rows: TableRow[] = []
 
-  // ── Header block (rows 1-3): STIKES + prodi + tahun akademik + doc code ──
-  // Row 1: "STIKES IBNU SINA AJIBARANG" (colspan=14, rowspan=3)
+  // ── Header block (rows 1-3): logo + STIKES + prodi + tahun akademik + doc code ──
+  // Row 1: logo (colspan=2, rowspan=3) + "STIKES IBNU SINA AJIBARANG" (colspan=12, rowspan=3)
+  const logoCell = logoData
+    ? new TableCell({
+        columnSpan: 2, rowSpan: 3,
+        verticalAlign: VerticalAlign.CENTER,
+        borders: cellBorders,
+        margins: { top: 40, bottom: 40, left: 80, right: 80 },
+        children: [new Paragraph({
+          alignment: AlignmentType.CENTER,
+          children: [new ImageRun({ data: logoData, type: 'png' as any, transformation: { width: 80, height: 80 } })],
+        })],
+      })
+    : tc('', { colSpan: 2, rowSpan: 3 })
+
   rows.push(tr([
-    tc('STIKES IBNU SINA AJIBARANG', { bold: true, center: true, size: 24, colSpan: 14, rowSpan: 3 }),
+    logoCell,
+    tc('STIKES IBNU SINA AJIBARANG', { bold: true, center: true, size: 24, colSpan: 12, rowSpan: 3 }),
   ]))
 
   // Row 4: Title
@@ -492,7 +508,7 @@ function buildSignatureTable(c: Record<string, string>): Table {
 
 // ────────────────────── Main buildDocx ──────────────────────
 
-function buildDocx(c: Record<string, string>): Document {
+function buildDocx(c: Record<string, string>, logoData: Uint8Array | null): Document {
   const mk = c.mata_kuliah || ''
   const ta = c.semester_akademik || ''
 
@@ -500,7 +516,16 @@ function buildDocx(c: Record<string, string>): Document {
   const contentChildren: Array<Paragraph | Table> = []
 
   // ── Cover (portrait) ──
-  coverChildren.push(gap(3000))
+  if (logoData) {
+    coverChildren.push(gap(2000))
+    coverChildren.push(new Paragraph({
+      alignment: AlignmentType.CENTER,
+      spacing: { after: 200 },
+      children: [new ImageRun({ data: logoData, type: 'png' as any, transformation: { width: 120, height: 120 } })],
+    }))
+  } else {
+    coverChildren.push(gap(3000))
+  }
   coverChildren.push(heading('RENCANA PEMBELAJARAN SEMESTER (RPS)', 30))
   coverChildren.push(heading('GENAP', 26, 60))
   coverChildren.push(heading(`Tahun Akademik ${ta}`, 26, 60))
@@ -532,7 +557,7 @@ function buildDocx(c: Record<string, string>): Document {
   // ── Content (landscape) ──
 
   // 14-column main content table
-  contentChildren.push(buildContentTable(c))
+  contentChildren.push(buildContentTable(c, logoData))
 
   // Page break before Pertemuan
   contentChildren.push(new Paragraph({ children: [new PageBreak()] }))
@@ -572,13 +597,24 @@ function coverMonthYear(dateStr: string): string {
   return `${MONTHS_UP[parts[1]] || parts[1]}, ${parts[0]}`
 }
 
+async function fetchLogo(): Promise<Uint8Array | null> {
+  try {
+    const res = await fetch(logoUrl)
+    const blob = await res.blob()
+    return new Uint8Array(await blob.arrayBuffer())
+  } catch {
+    return null
+  }
+}
+
 // ─────────────────────────── public export API ───────────────────────────
 
 export async function exportDocx(data: ExportData, filePath: string): Promise<void> {
   const startTime = Date.now()
   const c = data.content
   logger.info('EXPORT', 'export.docx_start')
-  const doc = buildDocx(c)
+  const logoData = await fetchLogo()
+  const doc = buildDocx(c, logoData)
   const blob = await Packer.toBlob(doc)
   const buffer = await blob.arrayBuffer()
   await window.electronAPI.writeFileToPath(filePath, new Uint8Array(buffer))

@@ -203,7 +203,7 @@ function prodiCode(c: Record<string, string>): string {
  *  - Dosen Pengampu
  *  - Matakuliah Syarat
  */
-function buildContentTable(c: Record<string, string>, logoData: Uint8Array | null): Table {
+function buildContentTable(c: Record<string, string>, logoData: string | null): Table {
   const sksT = (c.sks_t || '0').trim()
   const sksP = (c.sks_p || '0').trim()
   const ta = c.semester_akademik || ''
@@ -508,7 +508,7 @@ function buildSignatureTable(c: Record<string, string>): Table {
 
 // ────────────────────── Main buildDocx ──────────────────────
 
-function buildDocx(c: Record<string, string>, logoData: Uint8Array | null): Document {
+function buildDocx(c: Record<string, string>, logoData: string | null): Document {
   const mk = c.mata_kuliah || ''
   const ta = c.semester_akademik || ''
 
@@ -597,11 +597,23 @@ function coverMonthYear(dateStr: string): string {
   return `${MONTHS_UP[parts[1]] || parts[1]}, ${parts[0]}`
 }
 
-async function fetchLogo(): Promise<Uint8Array | null> {
+async function fetchLogo(): Promise<string | null> {
   try {
     const res = await fetch(logoUrl)
     const blob = await res.blob()
-    return new Uint8Array(await blob.arrayBuffer())
+    return new Promise((resolve) => {
+      const reader = new FileReader()
+      reader.onloadend = () => {
+        const result = reader.result
+        if (typeof result === 'string') {
+          resolve(result) // data:image/png;base64,...
+        } else {
+          resolve(null)
+        }
+      }
+      reader.onerror = () => resolve(null)
+      reader.readAsDataURL(blob)
+    })
   } catch {
     return null
   }

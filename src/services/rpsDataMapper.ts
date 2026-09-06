@@ -39,6 +39,14 @@ function prodiCode(p: string): string {
   return (p || '').toUpperCase().replace(/[^A-Z0-9]/g, '') || 'PRODI'
 }
 
+function buildBulanTahun(tgl: string): string {
+  if (!tgl) return ''
+  const d = new Date(tgl)
+  if (isNaN(d.getTime())) return ''
+  const month = MONTHS[String(d.getMonth() + 1).padStart(2, '0')] || ''
+  return month ? `${month} ${d.getFullYear()}` : ''
+}
+
 // ─────────────────────────── section builders ───────────────────────────
 
 function buildCapaian(c: Record<string, string>): string {
@@ -48,97 +56,101 @@ function buildCapaian(c: Record<string, string>): string {
 
   const makeRows = (items: StructuredItem[], emptyText: string) => {
     if (items.length === 0) {
-      return `<tr><td colspan=13 style='border-right:1.0pt solid black;border-left:none;width:528pt;color:#999;'>${emptyText}</td></tr>`
+      return `<tr><td colspan="13" style="border-right:1pt solid black;border-bottom:1pt solid black;color:#999;">${emptyText}</td></tr>`
     }
     return items.map(it =>
-      `<tr><td style='width:48pt;border-right:1.0pt solid black;'>${esc(it.label || '')}</td><td colspan=12 style='border-right:1.0pt solid black;border-left:none;width:528pt;'>${sanitizeRich(it.deskripsi || '')}</td></tr>`
+      `<tr><td style="border-right:1pt solid black;border-bottom:1pt solid black;">${esc(it.label || '')}</td><td colspan="12" style="border-right:1pt solid black;border-bottom:1pt solid black;">${sanitizeRich(it.deskripsi || '')}</td></tr>`
     ).join('\n')
   }
 
+  const cplRows = cpl.length > 0 ? makeRows(cpl, 'CPL belum diisi.') : `<tr><td colspan="12" style="border-right:1pt solid black;border-bottom:1pt solid black;color:#999;">CPL belum diisi.</td></tr>`
+  const cpmkRows = cpmk.length > 0 ? makeRows(cpmk, 'CPMK belum diisi.') : `<tr><td colspan="12" style="border-right:1pt solid black;border-bottom:1pt solid black;color:#999;">CPMK belum diisi.</td></tr>`
+  const subRows = sub.length > 0 ? makeRows(sub, 'Sub-CPMK belum diisi.') : `<tr><td colspan="12" style="border-right:1pt solid black;border-bottom:1pt solid black;color:#999;">Sub-CPMK belum diisi.</td></tr>`
+
+  const totalDataRows = Math.max(cpl.length, 1) + Math.max(cpmk.length, 1) + Math.max(sub.length, 1) + 3 // +3 for section headers
+
   return `
-<tr height=21 style='height:16.0pt'>
-  <td colspan=2 rowspan=23 height=981 style='border-right:1.0pt solid black;border-bottom:1.0pt solid black;height:736.0pt;width:96pt;font-weight:bold;vertical-align:top;'>Capaian<br>Pembelajaran<br>(CP)</td>
-  <td colspan=5 style='border-right:1.0pt solid black;border-left:none;width:240pt;font-weight:bold;'>CPL-PRODI yang dibebankan pada MK</td>
-  <td colspan=7 style='border-right:1.0pt solid black;border-left:none;width:336pt;'>&nbsp;</td>
+<tr>
+  <td rowspan="${totalDataRows}" colspan="2" style="border-right:1pt solid black;border-bottom:1pt solid black;font-weight:bold;vertical-align:top;">Capaian<br>Pembelajaran<br>(CP)</td>
+  <td colspan="5" style="border-right:1pt solid black;border-bottom:1pt solid black;font-weight:bold;">CPL-PRODI yang dibebankan pada MK</td>
+  <td colspan="7" style="border-right:1pt solid black;border-bottom:1pt solid black;">&nbsp;</td>
 </tr>
-${makeRows(cpl, 'CPL belum diisi.')}
-<tr height=21 style='height:16.0pt'>
-  <td colspan=5 height=21 style='border-right:1.0pt solid black;height:16.0pt;border-left:none;width:240pt;font-weight:bold;'>Capaian Pembelajaran Mata Kuliah (CPMK)</td>
-  <td colspan=7 style='border-right:1.0pt solid black;border-left:none;width:336pt;'>&nbsp;</td>
+${cplRows}
+<tr>
+  <td colspan="5" style="border-right:1pt solid black;border-bottom:1pt solid black;font-weight:bold;">Capaian Pembelajaran Mata Kuliah (CPMK)</td>
+  <td colspan="7" style="border-right:1pt solid black;border-bottom:1pt solid black;">&nbsp;</td>
 </tr>
-${makeRows(cpmk, 'CPMK belum diisi.')}
-<tr height=40 style='height:30.0pt'>
-  <td colspan=5 height=40 style='border-right:1.0pt solid black;height:30.0pt;border-left:none;width:240pt;font-weight:bold;'>Kemampuan akhir tiap tahapan belajar (Sub-CPMK)</td>
-  <td colspan=7 style='border-right:1.0pt solid black;border-left:none;width:336pt;'>&nbsp;</td>
+${cpmkRows}
+<tr>
+  <td colspan="5" style="border-right:1pt solid black;border-bottom:1pt solid black;font-weight:bold;">Kemampuan akhir tiap tahapan belajar (Sub-CPMK)</td>
+  <td colspan="7" style="border-right:1pt solid black;border-bottom:1pt solid black;">&nbsp;</td>
 </tr>
-${makeRows(sub, 'Sub-CPMK belum diisi.')}`
+${subRows}`
 }
 
 function buildBahanKajian(c: Record<string, string>): string {
   const items = parseJson<StructuredItem>(c.bahan_kajian)
   if (items.length === 0) {
-    return `<tr height=21 style='height:15.5pt'>
-  <td colspan=2 rowspan=2 height=42 style='border-right:1.0pt solid black;border-bottom:1.0pt solid black;height:31.5pt;width:96pt;font-weight:bold;vertical-align:top;'>Bahan<br>Kajian:<br>Materi<br>Pembelajaran</td>
-  <td colspan=12 style='border-right:1.0pt solid black;border-left:none;width:576pt;color:#999;'>Bahan kajian belum diisi.</td>
+    return `<tr>
+  <td colspan="2" rowspan="2" style="border-right:1pt solid black;border-bottom:1pt solid black;font-weight:bold;vertical-align:top;">Bahan<br>Kajian:<br>Materi<br>Pembelajaran</td>
+  <td colspan="12" style="border-right:1pt solid black;border-bottom:1pt solid black;color:#999;">Bahan kajian belum diisi.</td>
 </tr>`
   }
-  const rows = items.map((it, i) => {
-    const height = i === 0 ? '21' : '21'
-    return `<tr height=${height} style='height:15.5pt;'>
-  ${i === 0 ? `<td colspan=2 rowspan=${items.length} height=${items.length * 21} style='border-right:1.0pt solid black;border-bottom:1.0pt solid black;height:${items.length * 21 - 6}.0pt;width:96pt;font-weight:bold;vertical-align:top;'>Bahan<br>Kajian:<br>Materi<br>Pembelajaran</td>` : ''}
-  <td colspan=12 style='border-right:1.0pt solid black;border-left:none;width:576pt;'>${esc(it.label || '')}. ${sanitizeRich(it.deskripsi || it.judul || '')}</td>
+  const rows = items.map((it, i) =>
+    `<tr>
+  ${i === 0 ? `<td rowspan="${items.length}" colspan="2" style="border-right:1pt solid black;border-bottom:1pt solid black;font-weight:bold;vertical-align:top;">Bahan<br>Kajian:<br>Materi<br>Pembelajaran</td>` : ''}
+  <td colspan="12" style="border-right:1pt solid black;border-bottom:1pt solid black;">${esc(it.label || '')}. ${sanitizeRich(it.deskripsi || it.judul || '')}</td>
 </tr>`
-  }).join('\n')
+  ).join('\n')
   return rows
 }
 
 function buildPenilaian(c: Record<string, string>): string {
   const items = parseJson<PenilaianItem>(c.penilaian)
   if (items.length === 0) {
-    return `<tr height=21 style='height:15.5pt'>
-  <td colspan=2 rowspan=2 height=42 style='border-right:1.0pt solid black;border-bottom:1.0pt solid black;height:31.5pt;width:96pt;font-weight:bold;vertical-align:top;'>Penilaian</td>
-  <td colspan=12 style='border-right:1.0pt solid black;border-left:none;width:576pt;color:#999;'>Penilaian belum diisi.</td>
+    return `<tr>
+  <td colspan="2" rowspan="2" style="border-right:1pt solid black;border-bottom:1pt solid black;font-weight:bold;vertical-align:top;">Penilaian</td>
+  <td colspan="12" style="border-right:1pt solid black;border-bottom:1pt solid black;color:#999;">Penilaian belum diisi.</td>
 </tr>`
   }
   const rows = items.map((it, i) =>
-    `<tr height=21 style='height:15.5pt;'>
-  ${i === 0 ? `<td colspan=2 rowspan=${items.length} height=${items.length * 21} style='border-right:1.0pt solid black;border-bottom:1.0pt solid black;height:${items.length * 21 - 6}.0pt;width:96pt;font-weight:bold;vertical-align:top;'>Penilaian</td>` : ''}
-  <td colspan=12 style='border-right:1.0pt solid black;border-left:none;width:576pt;'>${esc(it.item)} : ${it.bobot}</td>
+    `<tr>
+  ${i === 0 ? `<td rowspan="${items.length}" colspan="2" style="border-right:1pt solid black;border-bottom:1pt solid black;font-weight:bold;vertical-align:top;">Penilaian</td>` : ''}
+  <td colspan="12" style="border-right:1pt solid black;border-bottom:1pt solid black;">${esc(it.item)} : ${it.bobot}</td>
 </tr>`
   ).join('\n')
   return rows
 }
 
 function buildPustaka(c: Record<string, string>): string {
-  const utama = (c.pustaka_utama || '').replace(/<[^>]+>/g, '&nbsp;').replace(/&nbsp;/g, ' ').trim()
-  const pendukung = (c.pustaka_pendukung || '').replace(/<[^>]+>/g, '&nbsp;').replace(/&nbsp;/g, ' ').trim()
+  const utama = (c.pustaka_utama || '').replace(/<[^>]+>/g, ' ').replace(/&nbsp;/g, ' ').trim()
+  const pendukung = (c.pustaka_pendukung || '').replace(/<[^>]+>/g, ' ').replace(/&nbsp;/g, ' ').trim()
 
   const utamaLines = utama ? utama.split('\n').filter(Boolean) : ['&nbsp;']
   const pendukungLines = pendukung ? pendukung.split('\n').filter(Boolean) : []
 
-  const utamaCount = utamaLines.length + 1 // +1 for "Utama:" header
-  const pendukungCount = pendukungLines.length + 1
+  const totalRows = utamaLines.length + 1 + (pendukungLines.length > 0 ? pendukungLines.length + 1 : 0)
 
-  let html = `<tr height=21 style='height:15.5pt;'>
-  <td colspan=2 rowspan=${utamaCount + pendukungCount} height=${(utamaCount + pendukungCount) * 21} style='border-right:1.0pt solid black;border-bottom:1.0pt solid black;height:${(utamaCount + pendukungCount) * 21 - 6}.0pt;width:96pt;font-weight:bold;vertical-align:top;'>Pustaka</td>
-  <td colspan=2 style='border-right:1.0pt solid black;border-left:none;width:96pt;font-weight:bold;'>Utama :</td>
-  <td colspan=10 style='border-right:1.0pt solid black;border-left:none;width:480pt;'>&nbsp;</td>
+  let html = `<tr>
+  <td rowspan="${totalRows}" colspan="2" style="border-right:1pt solid black;border-bottom:1pt solid black;font-weight:bold;vertical-align:top;">Pustaka</td>
+  <td colspan="2" style="border-right:1pt solid black;border-bottom:1pt solid black;font-weight:bold;">Utama :</td>
+  <td colspan="10" style="border-right:1pt solid black;border-bottom:1pt solid black;">&nbsp;</td>
 </tr>`
 
   utamaLines.forEach(line => {
-    html += `<tr height=21 style='height:15.5pt;'>
-  <td colspan=12 style='border-right:1.0pt solid black;border-left:none;width:576pt;'>${line}</td>
+    html += `<tr>
+  <td colspan="12" style="border-right:1pt solid black;border-bottom:1pt solid black;">${line}</td>
 </tr>`
   })
 
   if (pendukungLines.length > 0) {
-    html += `<tr height=21 style='height:15.5pt;'>
-  <td colspan=2 height=21 style='border-right:1.0pt solid black;height:15.5pt;width:96pt;font-weight:bold;'>Pendukung :</td>
-  <td colspan=10 style='border-right:1.0pt solid black;border-left:none;width:480pt;'>&nbsp;</td>
+    html += `<tr>
+  <td colspan="2" style="border-right:1pt solid black;border-bottom:1pt solid black;font-weight:bold;">Pendukung :</td>
+  <td colspan="10" style="border-right:1pt solid black;border-bottom:1pt solid black;">&nbsp;</td>
 </tr>`
     pendukungLines.forEach((line, i) => {
-      html += `<tr height=21 style='height:15.5pt;'>
-  <td colspan=12 style='border-right:1.0pt solid black;border-left:none;width:576pt;'>${i + 1}. ${line}</td>
+      html += `<tr>
+  <td colspan="12" style="border-right:1pt solid black;border-bottom:1pt solid black;">${i + 1}. ${line}</td>
 </tr>`
     })
   }
@@ -149,78 +161,58 @@ function buildPustaka(c: Record<string, string>): string {
 function buildPertemuan(c: Record<string, string>): string {
   const rows = parseJson<PertemuanRow>(c.pertemuan)
 
+  // 14-column header matching reference exactly
   const header = `
-<!-- Pertemuan Header Row 1-4 -->
-<tr height=60 style='height:45.0pt'>
-  <td rowspan=5 height=162 style='border-bottom:1.0pt solid black;height:121.5pt;border-top:none;width:48pt;font-weight:bold;text-align:center;'>No</td>
-  <td colspan=2 class=xl143 style='border-right:1.0pt solid black;border-left:none;width:96pt;font-weight:bold;text-align:center;'>Kemampuan akhir tiap tahapan belajar</td>
-  <td colspan=5 rowspan=4 class=xl143 style='border-right:1.0pt solid black;border-bottom:1.0pt solid black;width:240pt;font-weight:bold;text-align:center;'>Penilaian</td>
-  <td colspan=3 class=xl143 style='border-right:1.0pt solid black;border-left:none;width:144pt;font-weight:bold;text-align:center;'>Bantuk Pembelajaran,</td>
-  <td colspan=2 class=xl143 style='border-right:1.0pt solid black;border-left:none;width:96pt;font-weight:bold;text-align:center;'>Materi Pembelajaran</td>
-  <td rowspan=5 style='border-bottom:1.0pt solid black;border-top:none;width:48pt;font-weight:bold;text-align:center;'>Bobot Penilaian (%)</td>
+<!-- Pertemuan Header (5 rows, 14 cols) -->
+<tr>
+  <td rowspan="5" style="border:1pt solid black;font-weight:bold;text-align:center;vertical-align:middle;">No</td>
+  <td colspan="2" rowspan="4" style="border:1pt solid black;font-weight:bold;text-align:center;vertical-align:middle;">Kemampuan<br>akhir tiap<br>tahapan<br>belajar<br>(Sub-CPMK)</td>
+  <td colspan="5" rowspan="2" style="border:1pt solid black;font-weight:bold;text-align:center;vertical-align:middle;">Penilaian</td>
+  <td colspan="3" rowspan="4" style="border:1pt solid black;font-weight:bold;text-align:center;vertical-align:middle;">Bentuk<br>Pembelajaran,<br>Metode<br>Pembelajaran,<br>Penugasan<br>Mahasiswa,<br>[ Estimasi Waktu]</td>
+  <td colspan="2" rowspan="4" style="border:1pt solid black;font-weight:bold;text-align:center;vertical-align:middle;">Materi<br>Pembelajaran<br>[ Pustaka ]</td>
+  <td rowspan="5" style="border:1pt solid black;font-weight:bold;text-align:center;vertical-align:middle;">Bobot<br>Penilaian<br>(%)</td>
 </tr>
-<tr height=20 style='height:15.0pt'>
-  <td colspan=2 height=20 style='border-right:1.0pt solid black;height:15.0pt;border-left:none;width:96pt;font-weight:bold;text-align:center;'>(Sub-CPMK)</td>
-  <td colspan=3 style='border-right:1.0pt solid black;border-left:none;width:144pt;font-weight:bold;text-align:center;'>Metode Pembelajaran,</td>
-  <td colspan=2 style='border-right:1.0pt solid black;border-left:none;width:96pt;font-weight:bold;text-align:center;'>[ Pustaka ]</td>
+<tr>
+  <td colspan="2" rowspan="2" style="border:1pt solid black;font-weight:bold;text-align:center;vertical-align:middle;">Indikator</td>
+  <td colspan="3" rowspan="2" style="border:1pt solid black;font-weight:bold;text-align:center;vertical-align:middle;">Kriteria &amp;<br>Teknik</td>
 </tr>
-<tr height=20 style='height:15.0pt'>
-  <td colspan=2 height=20 style='border-right:1.0pt solid black;height:15.0pt;border-left:none;width:96pt;'>&nbsp;</td>
-  <td colspan=3 style='border-right:1.0pt solid black;border-left:none;width:144pt;font-weight:bold;text-align:center;'>Penugasan Mahasiswa,</td>
-  <td colspan=2 style='border-right:1.0pt solid black;border-left:none;width:96pt;'>&nbsp;</td>
+<tr>
 </tr>
-<tr height=21 style='height:15.5pt'>
-  <td colspan=2 height=21 style='border-right:1.0pt solid black;height:15.5pt;border-left:none;width:96pt;'>&nbsp;</td>
-  <td colspan=3 style='border-right:1.0pt solid black;border-left:none;width:144pt;font-weight:bold;text-align:center;'>[ Estimasi Waktu]</td>
-  <td colspan=2 style='border-right:1.0pt solid black;border-left:none;width:96pt;'>&nbsp;</td>
+<tr>
+  <td style="border:1pt solid black;font-weight:bold;text-align:center;">Luring<br>(offline)</td>
+  <td colspan="2" style="border:1pt solid black;font-weight:bold;text-align:center;">Daring<br>(online)</td>
 </tr>
-<tr height=41 style='height:31.0pt'>
-  <td colspan=2 height=41 style='border-right:1.0pt solid black;height:31.0pt;border-left:none;width:96pt;'>&nbsp;</td>
-  <td colspan=2 style='border-right:1.0pt solid black;border-left:none;width:96pt;font-weight:bold;text-align:center;'>Indikator</td>
-  <td colspan=3 style='border-right:1.0pt solid black;border-left:none;width:144pt;font-weight:bold;text-align:center;'>Kriteria &amp; Teknik</td>
-  <td style='width:48pt;font-weight:bold;text-align:center;'>Luring (offline)</td>
-  <td colspan=2 style='border-right:1.0pt solid black;border-left:none;width:96pt;font-weight:bold;text-align:center;'>Daring (online)</td>
-  <td colspan=2 style='border-right:1.0pt solid black;border-left:none;width:96pt;font-weight:bold;text-align:center;'>&nbsp;</td>
+<tr>
+  <td colspan="2" style="border:1pt solid black;">&nbsp;</td>
+  <td colspan="2" style="border:1pt solid black;font-weight:bold;text-align:center;">Indikator</td>
+  <td colspan="3" style="border:1pt solid black;font-weight:bold;text-align:center;">Kriteria &amp; Teknik</td>
+  <td style="border:1pt solid black;font-weight:bold;text-align:center;">Luring<br>(offline)</td>
+  <td colspan="2" style="border:1pt solid black;font-weight:bold;text-align:center;">Daring<br>(online)</td>
+  <td colspan="2" style="border:1pt solid black;font-weight:bold;text-align:center;">Materi<br>[ Pustaka ]</td>
 </tr>`
 
   if (rows.length === 0) {
     return header + `
-<tr height=21 style='height:15.5pt;'>
-  <td colspan=14 style='border:1.0pt solid black;text-align:center;color:#999;'>Belum ada jadwal pertemuan. Gunakan "Generate dari Sub-CPMK" di tab Pertemuan.</td>
+<tr>
+  <td colspan="14" style="border:1pt solid black;text-align:center;color:#999;">Belum ada jadwal pertemuan. Gunakan "Generate dari Sub-CPMK" di tab Pertemuan.</td>
 </tr>`
   }
 
   const body = rows.map(r => {
     if (r.type === 'uts' || r.type === 'uas') {
-      return `<tr height=21 style='height:15.5pt;'>
-  <td colspan=14 style='border:1.0pt solid black;text-align:center;font-weight:bold;background:#f0f0f0;'>${esc(r.label || (r.type === 'uts' ? 'UTS (UJIAN TENGAH SEMESTER)' : 'Evaluasi Akhir Semester'))}</td>
+      return `<tr>
+  <td colspan="14" style="border:1pt solid black;text-align:center;font-weight:bold;background:#f0f0f0;">${esc(r.label || (r.type === 'uts' ? 'UTS (UJIAN TENGAH SEMESTER)' : 'Evaluasi Akhir Semester'))}</td>
 </tr>`
     }
-    return `<tr height=41 style='height:31.0pt;'>
-  <td rowspan=5 style='border-bottom:1.0pt solid black;border-top:none;width:48pt;text-align:center;'>${r.no ?? ''}</td>
-  <td colspan=2 rowspan=5 style='border-right:1.0pt solid black;border-bottom:1.0pt solid black;width:96pt;vertical-align:top;'>${sanitizeRich(r.subCpmk || '')}</td>
-  <td colspan=2 rowspan=5 style='border-right:1.0pt solid black;border-bottom:1.0pt solid black;width:96pt;vertical-align:top;'>${sanitizeRich(r.indikator || '')}</td>
-  <td colspan=3 style='border-right:1.0pt solid black;border-left:none;width:144pt;vertical-align:top;'>Kriteria:<br>${sanitizeRich(r.kriteriaTeknik || '')}</td>
-  <td style='width:48pt;vertical-align:top;'>${sanitizeRich(r.luring || '')}</td>
-  <td colspan=2 rowspan=5 style='border-right:1.0pt solid black;border-bottom:1.0pt solid black;width:96pt;vertical-align:top;'>${sanitizeRich(r.daring || '')}</td>
-  <td colspan=2 rowspan=5 style='border-right:1.0pt solid black;border-bottom:1.0pt solid black;width:96pt;vertical-align:top;'>${sanitizeRich(r.materiPustaka || '')}</td>
-  <td rowspan=5 style='border-bottom:1.0pt solid black;border-top:none;width:48pt;text-align:center;'>${r.bobot || 0}</td>
-</tr>
-<tr height=62 style='height:46.5pt;'>
-  <td colspan=3 height=62 style='border-right:1.0pt solid black;height:46.5pt;border-left:none;width:144pt;vertical-align:top;'>Ketepatan dan penugasan</td>
-  <td style='width:48pt;vertical-align:top;'>Kuliah, tatap muka</td>
-</tr>
-<tr height=21 style='height:15.5pt;'>
-  <td colspan=3 height=21 style='border-right:1.0pt solid black;height:15.5pt;border-left:none;width:144pt;'>&nbsp;</td>
-  <td style='width:48pt;'>&nbsp;</td>
-</tr>
-<tr height=21 style='height:15.5pt;'>
-  <td colspan=3 height=21 style='border-right:1.0pt solid black;height:15.5pt;border-left:none;width:144pt;vertical-align:top;'>Teknik:</td>
-  <td style='width:48pt;'>MP: Pembelajaran kooperatif, interaktif dan diskusi</td>
-</tr>
-<tr height=41 style='height:31.0pt;'>
-  <td colspan=3 height=41 style='border-right:1.0pt solid black;height:31.0pt;border-left:none;width:144pt;'>Diskusi, Ceramah, Kuis (tes tertulis)</td>
-  <td style='width:48pt;'>&nbsp;</td>
+    return `<tr>
+  <td rowspan="5" style="border:1pt solid black;text-align:center;vertical-align:top;">${r.no ?? ''}</td>
+  <td colspan="2" rowspan="5" style="border:1pt solid black;vertical-align:top;">${sanitizeRich(r.subCpmk || '')}</td>
+  <td colspan="2" rowspan="5" style="border:1pt solid black;vertical-align:top;">${sanitizeRich(r.indikator || '')}</td>
+  <td colspan="3" rowspan="5" style="border:1pt solid black;vertical-align:top;">${sanitizeRich(r.kriteriaTeknik || '')}</td>
+  <td rowspan="5" style="border:1pt solid black;vertical-align:top;">${sanitizeRich(r.luring || '')}</td>
+  <td colspan="2" rowspan="5" style="border:1pt solid black;vertical-align:top;">${sanitizeRich(r.daring || '')}</td>
+  <td colspan="2" rowspan="5" style="border:1pt solid black;vertical-align:top;">${sanitizeRich(r.materiPustaka || '')}</td>
+  <td rowspan="5" style="border:1pt solid black;text-align:center;vertical-align:top;">${r.bobot || 0}</td>
 </tr>`
   }).join('\n')
 
@@ -241,7 +233,8 @@ export function buildRpsFromTemplate(content: Record<string, string>): string {
   const logoBase64 = getLogoBase64()
 
   const replacements: Record<string, string> = {
-    '{{logo}}': logoBase64 ? `<img src="${logoBase64}" style="width:96px;height:auto;" />` : '&nbsp;',
+    '{{logo}}': logoBase64 ? `<img src="${logoBase64}" style="width:80px;height:auto;" />` : '&nbsp;',
+    '{{logo_cover}}': logoBase64 ? `<img src="${logoBase64}" style="width:120px;height:auto;" />` : '&nbsp;',
     '{{doc_code}}': docCode,
     '{{prodi}}': esc((content.prodi || '').toUpperCase()),
     '{{semester_akademik}}': esc(content.semester_akademik || ''),
@@ -252,9 +245,16 @@ export function buildRpsFromTemplate(content: Record<string, string>): string {
     '{{sks_p}}': esc(sksP),
     '{{semester}}': esc(content.semester || ''),
     '{{tgl_penyusunan}}': fullDate(content.tgl_penyusunan) || '&nbsp;',
+    '{{bulan_tahun}}': buildBulanTahun(content.tgl_penyusunan) || esc(content.semester_akademik || ''),
     '{{pengembang_rps}}': esc(content.pengembang_rps || ''),
     '{{koordinator_rmk}}': esc(content.koordinator_rmk || ''),
     '{{kaprodi}}': esc(content.kaprodi || ''),
+    '{{ketua_stikes}}': esc(content.ketua_stikes || ''),
+    '{{wakil_ketua_1}}': esc(content.wakil_ketua_1 || ''),
+    '{{nidn_kaprodi}}': esc(content.nidn_kaprodi || '-'),
+    '{{nidn_ketua_stikes}}': esc(content.nidn_ketua_stikes || '-'),
+    '{{nidn_pengembang}}': esc(content.nidn_pengembang || '-'),
+    '{{nidn_wakil_ketua_1}}': esc(content.nidn_wakil_ketua_1 || '-'),
     '{{deskripsi_mk}}': sanitizeRich(content.deskripsi_mk || '') || '<span style="color:#999;">Deskripsi belum diisi.</span>',
     '{{dosen_pengampu}}': esc(content.dosen_pengampu || ''),
     '{{matakuliah_syarat}}': esc(content.matakuliah_syarat || '-'),

@@ -2,9 +2,6 @@ import { useMemo, useState, useEffect, useRef, useCallback } from 'react'
 import { buildRpsHtml } from '../services/rpsDocument'
 import { BackIcon, PreviewIcon, ExportWordIcon, ExportPdfIcon } from './icons'
 
-/** A4 width at 96dpi: 210mm ≈ 794px */
-const A4_W = 794
-
 interface PreviewPageProps {
   content: Record<string, string>
   onBack: () => void
@@ -16,19 +13,15 @@ export function PreviewPage({ content, onBack, onExportWord, onExportPdf }: Prev
   const html = useMemo(() => buildRpsHtml(content), [content])
   const mk = content.mata_kuliah || 'RPS'
 
-  const [zoom, setZoom] = useState(0.75)
+  const [zoom, setZoom] = useState(1)
   const [busy, setBusy] = useState<'word' | 'pdf' | null>(null)
   const toolbarRef = useRef<HTMLDivElement>(null)
-  const [viewport, setViewport] = useState({ w: window.innerWidth, h: window.innerHeight })
+  const [canvasH, setCanvasH] = useState(window.innerHeight)
 
-  // Fit-to-width zoom on resize
   useEffect(() => {
     const onResize = () => {
       const h = toolbarRef.current?.offsetHeight || 52
-      const availW = window.innerWidth - 48
-      const availH = window.innerHeight - h - 24
-      setViewport({ w: availW, h: availH })
-      setZoom(Math.min(1, availW / A4_W))
+      setCanvasH(window.innerHeight - h)
     }
     onResize()
     window.addEventListener('resize', onResize)
@@ -38,13 +31,11 @@ export function PreviewPage({ content, onBack, onExportWord, onExportPdf }: Prev
   const step = (dir: 1 | -1) => {
     setZoom(z => {
       const next = Math.round((z + dir * 0.1) * 100) / 100
-      return Math.min(1.5, Math.max(0.4, next))
+      return Math.min(2, Math.max(0.25, next))
     })
   }
 
-  const fit = useCallback(() => {
-    setZoom(Math.min(1, viewport.w / A4_W))
-  }, [viewport.w])
+  const fit = useCallback(() => setZoom(1), [])
 
   const runExport = async (kind: 'word' | 'pdf') => {
     if (busy) return
@@ -57,13 +48,8 @@ export function PreviewPage({ content, onBack, onExportWord, onExportPdf }: Prev
     }
   }
 
-  // iframe keeps its own page scroll; we scale it with CSS `zoom` (Chromium)
-  const iframeCssHeight = Math.max(300, viewport.h / zoom)
-  const renderedW = A4_W * zoom
-
   return (
     <div className="pv-root">
-      {/* Toolbar */}
       <div className="pv-toolbar" ref={toolbarRef}>
         <button className="pv-btn" onClick={onBack}>
           <BackIcon size={17} /> Kembali
@@ -90,13 +76,12 @@ export function PreviewPage({ content, onBack, onExportWord, onExportPdf }: Prev
         </div>
       </div>
 
-      {/* Document */}
       <div className="pv-canvas">
-        <div className="pv-page-slot" style={{ width: renderedW, height: viewport.h }}>
+        <div className="pv-page-slot" style={{ width: '100%', height: canvasH }}>
           <iframe
             title="Preview RPS"
             srcDoc={html}
-            style={{ width: A4_W, height: iframeCssHeight, zoom, border: 'none', background: '#e8e8e8' }}
+            style={{ width: '100%', height: '100%', zoom, border: 'none', background: '#fff' }}
           />
         </div>
       </div>

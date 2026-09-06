@@ -174,58 +174,64 @@ function buildDocx(c: Record<string, string>): Document {
   const ta = c.semester_akademik || ''
   const sem = c.semester === 'Ganjil' ? 'GANJIL' : c.semester === 'Genap' ? 'GENAP' : (c.semester || '').toUpperCase()
   const dateTxt = fullDate(c.tgl_penyusunan)
+  const docCode = `RPS/${prodiCode(c)}/${sem}/${(ta.split('-')[1] || '20__').trim()}`
 
-  const children: Array<Paragraph | Table> = []
+  const coverChildren: Array<Paragraph | Table> = []
+  const contentChildren: Array<Paragraph | Table> = []
 
-  // ── Cover ──
-  children.push(new Paragraph({ spacing: { before: 4000 }, children: [] }))
-  children.push(heading('RENCANA PEMBELAJARAN SEMESTER (RPS)', 30))
-  children.push(heading(sem, 26, 60))
-  children.push(heading(`TAHUN AKADEMIK ${ta}`, 26, 60))
-  children.push(new Paragraph({ spacing: { before: 1600 }, children: [] }))
-  children.push(heading(`${mk}${kode ? ` (${kode})` : ''}`, 34, 60, 200))
-  children.push(heading(c.prodi ? `PRODI ${c.prodi.toUpperCase()}` : '', 24, 60, 200))
-  children.push(new Paragraph({ alignment: AlignmentType.CENTER, spacing: { before: 400 }, children: [new TextRun({ text: 'Disusun Oleh :', size: 22, font: FONT_TWIPS })] }))
+  // ── Cover (portrait) ──
+  coverChildren.push(new Paragraph({ spacing: { before: 3000 }, children: [] }))
+  coverChildren.push(heading('RENCANA PEMBELAJARAN SEMESTER (RPS)', 30))
+  coverChildren.push(heading('GENAP', 26, 60))
+  coverChildren.push(heading(`Tahun Akademik ${ta}`, 26, 60))
+  coverChildren.push(new Paragraph({ spacing: { before: 1600 }, children: [] }))
+  coverChildren.push(heading(`Mata Kuliah : ${mk}${kode ? ` (${kode})` : ''}`, 34, 60, 200))
+  coverChildren.push(heading(`Prodi : ${c.prodi ? c.prodi.toUpperCase() : ''}`, 24, 60, 200))
+  coverChildren.push(new Paragraph({ alignment: AlignmentType.CENTER, spacing: { before: 400 }, children: [new TextRun({ text: 'Disusun Oleh:', size: 22, font: FONT_TWIPS })] }))
   const disusunNames: string[] = []
   if (c.pengembang_rps) disusunNames.push(...plainLines(c.pengembang_rps))
   if (c.dosen_pengampu) plainLines(c.dosen_pengampu).forEach(n => { if (!disusunNames.includes(n)) disusunNames.push(n) })
-  disusunNames.forEach(n => children.push(new Paragraph({
+  disusunNames.forEach(n => coverChildren.push(new Paragraph({
     alignment: AlignmentType.CENTER,
     spacing: { after: 0 },
     children: [new TextRun({ text: n, bold: true, size: 24, font: FONT_TWIPS })],
   })))
-  if (c.nidn_pengembang) children.push(new Paragraph({
+  if (c.nidn_pengembang) coverChildren.push(new Paragraph({
     alignment: AlignmentType.CENTER,
     spacing: { before: 40 },
     children: [new TextRun({ text: `NIDN. ${c.nidn_pengembang}`, size: 18, font: FONT_TWIPS })],
   }))
-  children.push(new Paragraph({ spacing: { before: 5000 }, children: [] }))
-  children.push(heading('STIKes IBNU SINA AJIBARANG', 28, 0))
-  children.push(heading(coverMonthYear(c.tgl_penyusunan), 22, 80))
+  coverChildren.push(new Paragraph({ spacing: { before: 4000 }, children: [] }))
+  coverChildren.push(heading('STIKES IBNU SINA AJIBARANG', 28, 0))
+  coverChildren.push(heading(coverMonthYear(c.tgl_penyusunan), 22, 80))
 
-  // ── Content ──
-  children.push(new Paragraph({ children: [new PageBreak()] }))
+  // ── Content (landscape) ──
 
   // header block
-  children.push(new Paragraph({
+  contentChildren.push(new Paragraph({
     alignment: AlignmentType.CENTER,
     spacing: { after: 40 },
-    children: [new TextRun({ text: 'STIKes IBNU SINA AJIBARANG', bold: true, size: 24, font: FONT_TWIPS })],
+    children: [new TextRun({ text: 'STIKES IBNU SINA AJIBARANG', bold: true, size: 24, font: FONT_TWIPS })],
   }))
-  children.push(new Paragraph({
+  contentChildren.push(new Paragraph({
     alignment: AlignmentType.CENTER,
     spacing: { after: 40 },
     children: [new TextRun({ text: c.prodi ? `PROGRAM STUDI ${c.prodi.toUpperCase()}` : '', bold: true, size: 20, font: FONT_TWIPS })],
   }))
-  children.push(new Paragraph({
+  contentChildren.push(new Paragraph({
+    alignment: AlignmentType.CENTER,
+    spacing: { after: 40 },
+    children: [new TextRun({ text: `TAHUN AKADEMIK ${ta}`, bold: true, size: 20, font: FONT_TWIPS })],
+  }))
+  contentChildren.push(new Paragraph({
     alignment: AlignmentType.CENTER,
     spacing: { after: 200 },
-    children: [new TextRun({ text: `Kode Dokumen : RPS/${prodiCode(c)}/${sem}/${(ta.split('-')[1] || '20__').trim()}`, size: 18, font: FONT_TWIPS })],
+    children: [new TextRun({ text: `Kode Dokumen : ${docCode}`, size: 18, font: FONT_TWIPS })],
   }))
 
-  children.push(heading('RENCANA PEMBELAJARAN SEMESTER', 28, 100, 200))
-  children.push(sectionTitle('A. Identitas Mata Kuliah'))
-  children.push(table100([
+  contentChildren.push(heading('RENCANA PEMBELAJARAN SEMESTER', 28, 100, 200))
+  contentChildren.push(sectionTitle('A. Identitas Mata Kuliah'))
+  contentChildren.push(table100([
     tableRow([textCell('MATA KULIAH (MK)', { bold: true, widthPct: 24 }), textCell(c.mata_kuliah || '', { widthPct: 76 })]),
     tableRow([textCell('KODE', { bold: true, widthPct: 24 }), textCell(c.kode_mk || '', { widthPct: 76 })]),
     tableRow([textCell('Rumpun MK', { bold: true, widthPct: 24 }), textCell(c.rumpun_mk || '', { widthPct: 76 })]),
@@ -236,8 +242,8 @@ function buildDocx(c: Record<string, string>): Document {
     tableRow([textCell('Matakuliah Syarat', { bold: true, widthPct: 24 }), textCell(c.matakuliah_syarat || '-', { widthPct: 76 })]),
   ]))
 
-  children.push(sectionTitle('B. Otorisasi'))
-  children.push(table100([
+  contentChildren.push(sectionTitle('B. Otorisasi'))
+  contentChildren.push(table100([
     tableRow([
       textCell('Pengembang RPS', { bold: true, center: true, widthPct: 33 }),
       textCell('Koordinator RMK', { bold: true, center: true, widthPct: 34 }),
@@ -250,14 +256,14 @@ function buildDocx(c: Record<string, string>): Document {
     ]),
   ]))
 
-  children.push(sectionTitle('C. Capaian Pembelajaran (CP)'))
+  contentChildren.push(sectionTitle('C. Capaian Pembelajaran (CP)'))
   const cpTable = (label: string, items: StructuredItem[]) => {
     if (items.length === 0) return
-    children.push(new Paragraph({
+    contentChildren.push(new Paragraph({
       spacing: { before: 120, after: 80 },
       children: [new TextRun({ text: label, bold: true, size: 20, font: FONT_TWIPS })],
     }))
-    children.push(table100(items.map(it => tableRow([
+    contentChildren.push(table100(items.map(it => tableRow([
       textCell(it.label || '', { bold: true, widthPct: 16 }),
       richCell(it.deskripsi || '', { widthPct: 84 }),
     ]))))
@@ -266,43 +272,43 @@ function buildDocx(c: Record<string, string>): Document {
   cpTable('Capaian Pembelajaran Mata Kuliah (CPMK)', parseStructured(c.cpmk))
   cpTable('Kemampuan Akhir Tiap Tahapan Belajar (Sub-CPMK)', parseStructured(c.sub_cpmk))
 
-  children.push(sectionTitle('D. Deskripsi Singkat Mata Kuliah'))
-  richParagraphs(c.deskripsi_mk || '', 20).forEach(p => children.push(p))
+  contentChildren.push(sectionTitle('D. Deskripsi Singkat Mata Kuliah'))
+  richParagraphs(c.deskripsi_mk || '', 20).forEach(p => contentChildren.push(p))
 
-  children.push(sectionTitle('E. Bahan Kajian : Materi Pembelajaran'))
+  contentChildren.push(sectionTitle('E. Bahan Kajian : Materi Pembelajaran'))
   const bahan = parseStructured(c.bahan_kajian)
   if (bahan.length === 0) {
-    richParagraphs('', 20).forEach(p => children.push(p))
+    richParagraphs('', 20).forEach(p => contentChildren.push(p))
   } else {
-    children.push(table100(bahan.map(b => tableRow([
+    contentChildren.push(table100(bahan.map(b => tableRow([
       textCell(b.label || '', { bold: true, widthPct: 8 }),
       richCell(b.deskripsi || b.judul || '', { widthPct: 92 }),
     ]))))
   }
 
-  children.push(sectionTitle('F. Penilaian'))
+  contentChildren.push(sectionTitle('F. Penilaian'))
   const penilaian = parsePenilaian(c.penilaian)
   const total = penilaian.reduce((s, p) => s + (p.bobot || 0), 0)
   if (penilaian.length > 0) {
-    children.push(table100(penilaian.map(p => tableRow([
+    contentChildren.push(table100(penilaian.map(p => tableRow([
       textCell(p.item || '', { widthPct: 30 }),
       textCell(`${p.bobot || 0}%`, { widthPct: 70 }),
     ]))))
-    children.push(new Paragraph({
+    contentChildren.push(new Paragraph({
       spacing: { before: 60 },
       children: [new TextRun({ text: `Total: ${total}%`, bold: true, size: 20, font: FONT_TWIPS })],
     }))
   }
 
-  children.push(sectionTitle('G. Pustaka'))
+  contentChildren.push(sectionTitle('G. Pustaka'))
   const pustaka = (title: string, value: string) => {
     const lines = plainLines(value)
     if (lines.length === 0) return
-    children.push(new Paragraph({
+    contentChildren.push(new Paragraph({
       spacing: { before: 80, after: 40 },
       children: [new TextRun({ text: title, bold: true, size: 20, font: FONT_TWIPS })],
     }))
-    lines.forEach(l => children.push(new Paragraph({
+    lines.forEach(l => contentChildren.push(new Paragraph({
       spacing: { after: 40 },
       children: [new TextRun({ text: l, size: 20, font: FONT_TWIPS })],
     })))
@@ -311,8 +317,8 @@ function buildDocx(c: Record<string, string>): Document {
   pustaka('Pendukung:', c.pustaka_pendukung || '')
 
   // ── Pertemuan table ──
-  children.push(new Paragraph({ children: [new PageBreak()] }))
-  children.push(heading('JADWAL PELAKSANAAN PEMBELAJARAN / PERTEMUAN', 26, 0, 160))
+  contentChildren.push(new Paragraph({ children: [new PageBreak()] }))
+  contentChildren.push(heading('JADWAL PELAKSANAAN PEMBELAJARAN / PERTEMUAN', 26, 0, 160))
 
   // 14-column layout matching the Excel RPS reference
   const ptmHeaders = [
@@ -378,11 +384,11 @@ function buildDocx(c: Record<string, string>): Document {
       ]))
     })
   }
-  children.push(table100(ptmRows))
+  contentChildren.push(table100(ptmRows))
 
   // ── TTD ──
-  children.push(new Paragraph({ children: [new PageBreak()] }))
-  children.push(heading('PENGESAHAN', 28, 0, 300))
+  contentChildren.push(new Paragraph({ children: [new PageBreak()] }))
+  contentChildren.push(heading('PENGESAHAN', 28, 0, 300))
   const where = dateTxt ? `Ajibarang, ${dateTxt}` : 'Ajibarang,'
   /** Signature box: header line, reserved space, dotted-ish gap, then name/NIDN/role */
   const sigCell = (top: string, name: string, nidn: string, role: string) => new TableCell({
@@ -397,40 +403,27 @@ function buildDocx(c: Record<string, string>): Document {
       new Paragraph({ alignment: AlignmentType.CENTER, spacing: { before: 80 }, children: [new TextRun({ text: role, size: 18, font: FONT_TWIPS })] }),
     ],
   })
-  children.push(table100([
-    tableRow([
-      sigCell(where, c.dosen_pengampu || '', '', 'Dosen Pengampu'),
-      sigCell(where, c.pengembang_rps || '', c.nidn_pengembang || '', 'Pengembang RPS'),
-    ]),
-  ]))
-  children.push(table100([
+  contentChildren.push(table100([
     tableRow([
       sigCell('Mengetahui,', c.kaprodi || '', c.nidn_kaprodi || '', c.prodi ? `Kaprodi ${c.prodi}` : 'Kaprodi'),
-      sigCell('Mengetahui,', c.wakil_ketua_i || '', c.nidn_wakil_ketua_i || '', 'Wakil Ketua I Bidang Akademik'),
+      sigCell('Mengetahui,', c.pengembang_rps || '', c.nidn_pengembang || '', 'Dosen Pengampu'),
     ]),
   ]))
-  children.push(table100([
-    new TableRow({
-      children: [new TableCell({
-        columnSpan: 2,
-        borders: cellBorders,
-        verticalAlign: VerticalAlign.CENTER,
-        margins: { top: 120, bottom: 120, left: 120, right: 120 },
-        children: [
-          new Paragraph({ alignment: AlignmentType.CENTER, spacing: { after: 2600 }, children: [new TextRun({ text: 'Mengetahui,', size: 20, font: FONT_TWIPS })] }),
-          new Paragraph({ alignment: AlignmentType.CENTER, children: [new TextRun({ text: c.ketua_stikes || ' ', bold: true, size: 22, font: FONT_TWIPS })] }),
-          new Paragraph({ alignment: AlignmentType.CENTER, children: [new TextRun({ text: c.nidn_ketua_stikes ? `NIDN. ${c.nidn_ketua_stikes}` : '', size: 18, font: FONT_TWIPS })] }),
-          new Paragraph({ alignment: AlignmentType.CENTER, spacing: { before: 80 }, children: [new TextRun({ text: 'Ketua STIKes Ibnu Sina Ajibarang', size: 18, font: FONT_TWIPS })] }),
-        ],
-      })],
-    }),
+  contentChildren.push(table100([
+    tableRow([
+      sigCell('Mengetahui,', c.ketua_stikes || '', c.nidn_ketua_stikes || '', 'Ketua STIKes Ibnu Sina Ajibarang'),
+      sigCell('Mengetahui,', c.wakil_ketua_i || '', c.nidn_wakil_ketua_i || '', 'Wakil Ketua I Bidang Akademik'),
+    ]),
   ]))
 
   return new Document({
     creator: 'RPS Maker UNISINA',
     title: `RPS ${mk}`,
     styles: { default: { document: { run: { font: FONT_TWIPS, size: 21 } } } },
-    sections: [{ properties: { page: { size: { orientation: 'landscape' } } }, children }],
+    sections: [
+      { properties: { page: { size: { orientation: 'portrait' } } }, children: coverChildren },
+      { properties: { page: { size: { orientation: 'landscape' } } }, children: contentChildren },
+    ],
   })
 }
 

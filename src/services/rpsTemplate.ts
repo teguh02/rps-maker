@@ -1,86 +1,133 @@
 /**
  * Static RPS HTML template based on the official UNISINA Excel→HTML conversion.
- * All example values are replaced with {{placeholders}}.
+ * Multi-page layout: Portrait Cover → Landscape Content → Landscape Signature.
  * The mapper (rpsDataMapper.ts) fills in actual data at export/preview time.
  */
 
 export function getRpsTemplate(): string {
   return `<!DOCTYPE html>
-<html xmlns:v="urn:schemas-microsoft-com:vml"
-xmlns:o="urn:schemas-microsoft-com:office:office"
-xmlns:x="urn:schemas-microsoft-com:office:excel"
-xmlns="http://www.w3.org/TR/REC-html40">
+<html>
 <head>
-<meta http-equiv=Content-Type content="text/html; charset=utf-8">
+<meta http-equiv="Content-Type" content="text/html; charset=utf-8">
 <style>
-@page { size: A4 landscape; margin: .75in .7in .75in .7in; }
-table { border-collapse: collapse; }
-body { font-family: 'Times New Roman', Times, serif; font-size: 11pt; }
+* { box-sizing: border-box; }
+@page { size: A4 landscape; margin: 1.5cm; }
+@page cover { size: A4 portrait; margin: 2cm; }
+@page signature { size: A4 landscape; margin: 1.5cm; }
+body { font-family: 'Times New Roman', Times, serif; font-size: 11pt; margin: 0; padding: 0; color: #000; }
+table { border-collapse: collapse; width: 100%; }
+td, th { vertical-align: middle; }
+
+/* ── Cover Page ── */
+.cover { page: cover; page-break-after: always; width: 100%; min-height: 1122px; display: flex; flex-direction: column; justify-content: center; align-items: center; text-align: center; page-break-before: avoid; }
+.cover-inner { width: 100%; max-width: 500px; border: 2px solid #000; padding: 40px 30px; }
+.cover h1 { font-size: 16pt; margin: 0 0 8pt 0; }
+.cover h2 { font-size: 14pt; font-weight: normal; margin: 0 0 6pt 0; }
+.cover .logo { margin: 30pt 0; }
+.cover .logo img { width: 120px; height: auto; }
+.cover .disusun { font-size: 13pt; margin: 20pt 0 6pt 0; }
+.cover .dosen { font-size: 13pt; font-weight: bold; margin: 0 0 20pt 0; }
+.cover .institusi { font-size: 14pt; font-weight: bold; margin: 0 0 6pt 0; }
+.cover .bulan { font-size: 12pt; margin: 10pt 0 0 0; }
+
+/* ── Content Pages ── */
+.content { page: content; }
+.content table { border-collapse: collapse; }
+.content td { border: 1pt solid black; padding: 2pt 4pt; font-size: 10pt; }
+.content .hdr-logo { width: 96pt; }
+.content .hdr-text { font-weight: bold; text-align: center; }
+.content .hdr-sm { font-size: 9pt; text-align: center; }
+.content .bold { font-weight: bold; }
+.content .center { text-align: center; }
+.content .top { vertical-align: top; }
+
+/* ── Signature Page ── */
+.signature { page: signature; page-break-before: always; }
+.signature table { border-collapse: collapse; }
+.signature td { padding: 2pt 4pt; font-size: 10pt; vertical-align: top; }
 </style>
 </head>
 <body>
-<table border=0 cellpadding=0 cellspacing=0 width=896 style='border-collapse:collapse;table-layout:fixed;width:672pt'>
-<col width=64 span=14 style='width:48pt'>
 
-<!-- Row 1-3: Header -->
-<tr height=20 style='height:15.0pt'>
-  <td colspan=2 rowspan=3 height=61 style='border-right:1.0pt solid black;border-bottom:1.0pt solid black;height:45.5pt;width:96pt'>{{logo}}</td>
-  <td colspan=10 style='border-right:1.0pt solid black;border-left:none;width:480pt;font-size:14pt;font-weight:bold;text-align:center;'>STIKES IBNU SINA AJIBARANG</td>
-  <td colspan=2 rowspan=3 style='border-right:1.0pt solid black;border-bottom:1.0pt solid black;width:96pt;font-size:10pt;text-align:center;'>{{doc_code}}</td>
+<!-- COVER PAGE -->
+<div class="cover">
+  <div class="cover-inner">
+    <h1>RENCANA PEMBELAJARAN SEMESTER (RPS)<br>GENAP</h1>
+    <h2>Tahun Akademik {{semester_akademik}}</h2>
+    <h2>Mata Kuliah : {{mata_kuliah}} ({{kode_mk}})</h2>
+    <h2>Prodi : {{prodi}}</h2>
+    <div class="logo">{{logo_cover}}</div>
+    <div class="disusun">Disusun Oleh:</div>
+    <div class="dosen">{{pengembang_rps}}</div>
+    <div class="institusi">STIKES IBNU SINA AJIBARANG</div>
+    <div class="bulan">{{bulan_tahun}}</div>
+  </div>
+</div>
+
+<!-- CONTENT PAGES -->
+<div class="content">
+<table border="1" cellpadding="0" cellspacing="0" width="100%" style="border-collapse:collapse;border:none;">
+<col width="48"><col width="48"><col width="48"><col width="48"><col width="48"><col width="48"><col width="48"><col width="48"><col width="48"><col width="48"><col width="48"><col width="48"><col width="48"><col width="48">
+
+<!-- Row 1-3: Header Block -->
+<tr>
+  <td rowspan="3" colspan="2" width="96" class="hdr-logo" style="text-align:center;border-right:1pt solid black;border-bottom:1pt solid black;">{{logo}}</td>
+  <td colspan="10" style="border-right:1pt solid black;border-bottom:1pt solid black;font-size:14pt;font-weight:bold;text-align:center;">STIKES IBNU SINA AJIBARANG</td>
+  <td colspan="2" rowspan="3" style="border-right:1pt solid black;border-bottom:1pt solid black;font-size:9pt;text-align:center;vertical-align:top;">{{doc_code}}</td>
 </tr>
-<tr height=20 style='height:15.0pt'>
-  <td colspan=10 height=20 style='border-right:1.0pt solid black;height:15.0pt;border-left:none;width:480pt;font-size:12pt;font-weight:bold;text-align:center;'>PROGRAM STUDI {{prodi}}</td>
+<tr>
+  <td colspan="10" style="border-right:1pt solid black;border-bottom:1pt solid black;font-weight:bold;text-align:center;">PROGRAM STUDI {{prodi}}</td>
 </tr>
-<tr height=21 style='height:15.5pt'>
-  <td colspan=10 height=21 style='border-right:1.0pt solid black;height:15.5pt;border-left:none;width:480pt;font-size:12pt;font-weight:bold;text-align:center;'>TAHUN AKADEMIK {{semester_akademik}}</td>
+<tr>
+  <td colspan="10" style="border-right:1pt solid black;border-bottom:1pt solid black;font-weight:bold;text-align:center;">TAHUN AKADEMIK {{semester_akademik}}</td>
 </tr>
 
 <!-- Row 4: Title -->
-<tr height=21 style='height:15.5pt'>
-  <td colspan=14 height=21 style='border-right:1.0pt solid black;height:15.5pt;width:672pt;font-size:12pt;font-weight:bold;text-align:center;'>RENCANA PEMBELAJARAN SEMESTER</td>
+<tr>
+  <td colspan="14" style="border-right:1pt solid black;border-bottom:1pt solid black;font-weight:bold;text-align:center;">RENCANA PEMBELAJARAN SEMESTER</td>
 </tr>
 
 <!-- Row 5: Identitas Header -->
-<tr height=41 style='height:30.5pt'>
-  <td colspan=4 height=41 style='border-right:1.0pt solid black;height:30.5pt;width:192pt;font-weight:bold;'>MATA KULIAH (MK)</td>
-  <td colspan=2 style='border-right:1.0pt solid black;border-left:none;width:96pt;font-weight:bold;'>KODE</td>
-  <td colspan=3 style='border-right:1.0pt solid black;border-left:none;width:144pt;font-weight:bold;'>Rumpun MK</td>
-  <td colspan=2 style='border-right:1.0pt solid black;border-left:none;width:96pt;font-weight:bold;'>BOBOT (sks)</td>
-  <td style='width:48pt;font-weight:bold;'>SEMESTER</td>
-  <td colspan=2 style='border-right:1.0pt solid black;border-left:none;width:96pt;font-weight:bold;'>Tgl Penyusunan</td>
+<tr>
+  <td colspan="4" style="border-right:1pt solid black;border-bottom:1pt solid black;font-weight:bold;">MATA KULIAH (MK)</td>
+  <td colspan="2" style="border-right:1pt solid black;border-bottom:1pt solid black;font-weight:bold;">KODE</td>
+  <td colspan="3" style="border-right:1pt solid black;border-bottom:1pt solid black;font-weight:bold;">Rumpun MK</td>
+  <td colspan="2" style="border-right:1pt solid black;border-bottom:1pt solid black;font-weight:bold;">BOBOT (sks)</td>
+  <td style="border-right:1pt solid black;border-bottom:1pt solid black;font-weight:bold;">SEMESTER</td>
+  <td colspan="2" style="border-right:1pt solid black;border-bottom:1pt solid black;font-weight:bold;">Tgl Penyusunan</td>
 </tr>
 
 <!-- Row 6: Identitas Values -->
-<tr height=21 style='height:16.0pt'>
-  <td colspan=4 height=21 style='border-right:1.0pt solid black;height:16.0pt;width:192pt;'>{{mata_kuliah}}</td>
-  <td colspan=2 style='border-right:1.0pt solid black;border-left:none;width:96pt;'>{{kode_mk}}</td>
-  <td colspan=3 style='border-right:1.0pt solid black;border-left:none;width:144pt;'>{{rumpun_mk}}</td>
-  <td style='width:48pt;'>T= {{sks_t}}</td>
-  <td style='width:48pt;'>P= {{sks_p}}</td>
-  <td style='width:48pt;'>{{semester}}</td>
-  <td colspan=2 style='border-right:1.0pt solid black;border-left:none;width:96pt;'>{{tgl_penyusunan}}</td>
+<tr>
+  <td colspan="4" style="border-right:1pt solid black;border-bottom:1pt solid black;">{{mata_kuliah}}</td>
+  <td colspan="2" style="border-right:1pt solid black;border-bottom:1pt solid black;">{{kode_mk}}</td>
+  <td colspan="3" style="border-right:1pt solid black;border-bottom:1pt solid black;">{{rumpun_mk}}</td>
+  <td style="border-right:1pt solid black;border-bottom:1pt solid black;">T= {{sks_t}}</td>
+  <td style="border-right:1pt solid black;border-bottom:1pt solid black;">P= {{sks_p}}</td>
+  <td style="border-right:1pt solid black;border-bottom:1pt solid black;">{{semester}}</td>
+  <td colspan="2" style="border-right:1pt solid black;border-bottom:1pt solid black;">{{tgl_penyusunan}}</td>
 </tr>
 
 <!-- Row 7-8: Otorisasi -->
-<tr height=21 style='height:15.5pt'>
-  <td colspan=4 rowspan=2 height=61 style='border-right:1.0pt solid black;border-bottom:1.0pt solid black;height:45.5pt;width:192pt;font-weight:bold;'>OTORISASI</td>
-  <td colspan=3 style='border-right:1.0pt solid black;border-left:none;width:144pt;font-weight:bold;'>Pengembang RPS</td>
-  <td colspan=4 style='border-right:1.0pt solid black;border-left:none;width:192pt;font-weight:bold;'>Koordinator RMK</td>
-  <td colspan=3 style='border-right:1.0pt solid black;border-left:none;width:144pt;font-weight:bold;'>Ketua Program Studi</td>
+<tr>
+  <td rowspan="2" colspan="4" style="border-right:1pt solid black;border-bottom:1pt solid black;font-weight:bold;vertical-align:top;">OTORISASI</td>
+  <td colspan="3" style="border-right:1pt solid black;border-bottom:1pt solid black;font-weight:bold;">Pengembang RPS</td>
+  <td colspan="4" style="border-right:1pt solid black;border-bottom:1pt solid black;font-weight:bold;">Koordinator RMK</td>
+  <td colspan="3" style="border-right:1pt solid black;border-bottom:1pt solid black;font-weight:bold;">Ketua Program Studi</td>
 </tr>
-<tr height=40 style='height:30.0pt'>
-  <td colspan=3 height=40 style='border-right:1.0pt solid black;height:30.0pt;border-left:none;width:144pt;'>{{pengembang_rps}}</td>
-  <td colspan=4 style='border-right:1.0pt solid black;border-left:none;width:192pt;'>{{koordinator_rmk}}</td>
-  <td colspan=3 style='border-right:1.0pt solid black;border-left:none;width:144pt;'>{{kaprodi}}</td>
+<tr>
+  <td colspan="3" style="border-right:1pt solid black;border-bottom:1pt solid black;">{{pengembang_rps}}</td>
+  <td colspan="4" style="border-right:1pt solid black;border-bottom:1pt solid black;">{{koordinator_rmk}}</td>
+  <td colspan="3" style="border-right:1pt solid black;border-bottom:1pt solid black;">{{kaprodi}}</td>
 </tr>
 
-<!-- Row 9+: Capaian Pembelajaran (CPL + CPMK + Sub-CPMK) -->
+<!-- CPL / CPMK / Sub-CPMK Section -->
 {{capaian_section}}
 
-<!-- Deskripsi -->
-<tr height=103 style='height:77.5pt'>
-  <td colspan=2 height=103 style='border-right:1.0pt solid black;height:77.5pt;width:96pt;font-weight:bold;'>Deskripsi Singkat MK</td>
-  <td colspan=12 style='border-right:1.0pt solid black;border-left:none;width:576pt;'>{{deskripsi_mk}}</td>
+<!-- Deskripsi Singkat MK -->
+<tr>
+  <td colspan="2" style="border-right:1pt solid black;border-bottom:1pt solid black;font-weight:bold;vertical-align:top;">Deskripsi Singkat MK</td>
+  <td colspan="12" style="border-right:1pt solid black;border-bottom:1pt solid black;">{{deskripsi_mk}}</td>
 </tr>
 
 <!-- Bahan Kajian -->
@@ -92,20 +139,75 @@ body { font-family: 'Times New Roman', Times, serif; font-size: 11pt; }
 <!-- Pustaka -->
 {{pustaka_section}}
 
-<!-- Dosen & Prasyarat -->
-<tr height=21 style='height:15.5pt'>
-  <td colspan=2 height=21 style='border-right:1.0pt solid black;height:15.5pt;width:96pt;font-weight:bold;'>Dosen Pengampu</td>
-  <td colspan=12 style='border-right:1.0pt solid black;border-left:none;width:576pt;'>{{dosen_pengampu}}</td>
-</tr>
-<tr height=40 style='height:30.0pt'>
-  <td colspan=2 height=40 style='border-right:1.0pt solid black;height:30.0pt;width:96pt;font-weight:bold;'>Matakuliah Syarat</td>
-  <td colspan=12 style='border-right:1.0pt solid black;border-left:none;width:576pt;'>{{matakuliah_syarat}}</td>
+<!-- Dosen Pengampu -->
+<tr>
+  <td colspan="2" style="border-right:1pt solid black;border-bottom:1pt solid black;font-weight:bold;">Dosen Pengampu</td>
+  <td colspan="12" style="border-right:1pt solid black;border-bottom:1pt solid black;">{{dosen_pengampu}}</td>
 </tr>
 
-<!-- Tabel Pertemuan Header + Rows -->
+<!-- Matakuliah Syarat -->
+<tr>
+  <td colspan="2" style="border-right:1pt solid black;border-bottom:1pt solid black;font-weight:bold;">Matakuliah Syarat</td>
+  <td colspan="12" style="border-right:1pt solid black;border-bottom:1pt solid black;">{{matakuliah_syarat}}</td>
+</tr>
+
+<!-- Pertemuan Section -->
 {{pertemuan_section}}
 
 </table>
+</div>
+
+<!-- SIGNATURE PAGE -->
+<div class="signature">
+<table border="0" cellpadding="0" cellspacing="0" width="100%">
+<tr>
+  <td width="50%" style="padding-right:40pt;vertical-align:top;">
+    <table border="0" cellpadding="0" cellspacing="0" width="100%">
+      <tr><td style="border:none;padding:0;">Mengetahui,</td></tr>
+      <tr><td style="border:none;padding:0;height:60pt;"></td></tr>
+      <tr><td style="border:none;padding:0;border-bottom:1pt solid black;width:150pt;">&nbsp;</td></tr>
+      <tr><td style="border:none;padding:2pt 0;font-weight:bold;">Ketua Program Studi {{prodi}}</td></tr>
+      <tr><td style="border:none;padding:2pt 0;">{{kaprodi}}</td></tr>
+      <tr><td style="border:none;padding:2pt 0;">NIDN. {{nidn_kaprodi}}</td></tr>
+    </table>
+  </td>
+  <td width="50%" style="padding-left:40pt;vertical-align:top;">
+    <table border="0" cellpadding="0" cellspacing="0" width="100%">
+      <tr><td style="border:none;padding:0;">Mengetahui,</td></tr>
+      <tr><td style="border:none;padding:0;height:60pt;"></td></tr>
+      <tr><td style="border:none;padding:0;border-bottom:1pt solid black;width:150pt;">&nbsp;</td></tr>
+      <tr><td style="border:none;padding:2pt 0;font-weight:bold;">Ketua STIKes IBNU SINA AJIBARANG</td></tr>
+      <tr><td style="border:none;padding:2pt 0;">{{ketua_stikes}}</td></tr>
+      <tr><td style="border:none;padding:2pt 0;">NIDN. {{nidn_ketua_stikes}}</td></tr>
+    </table>
+  </td>
+</tr>
+<tr><td colspan="2" style="border:none;padding:30pt 0 0 0;"></td></tr>
+<tr>
+  <td width="50%" style="padding-right:40pt;vertical-align:top;">
+    <table border="0" cellpadding="0" cellspacing="0" width="100%">
+      <tr><td style="border:none;padding:0;">Ajibarang, {{tgl_penyusunan}}</td></tr>
+      <tr><td style="border:none;padding:0;height:60pt;"></td></tr>
+      <tr><td style="border:none;padding:0;border-bottom:1pt solid black;width:150pt;">&nbsp;</td></tr>
+      <tr><td style="border:none;padding:2pt 0;font-weight:bold;">Dosen Pengampu</td></tr>
+      <tr><td style="border:none;padding:2pt 0;">{{pengembang_rps}}</td></tr>
+      <tr><td style="border:none;padding:2pt 0;">NIDN. {{nidn_pengembang}}</td></tr>
+    </table>
+  </td>
+  <td width="50%" style="padding-left:40pt;vertical-align:top;">
+    <table border="0" cellpadding="0" cellspacing="0" width="100%">
+      <tr><td style="border:none;padding:0;">Mengetahui,</td></tr>
+      <tr><td style="border:none;padding:0;height:60pt;"></td></tr>
+      <tr><td style="border:none;padding:0;border-bottom:1pt solid black;width:150pt;">&nbsp;</td></tr>
+      <tr><td style="border:none;padding:2pt 0;font-weight:bold;">Wakil Ketua I</td></tr>
+      <tr><td style="border:none;padding:2pt 0;">{{wakil_ketua_1}}</td></tr>
+      <tr><td style="border:none;padding:2pt 0;">NIDN. {{nidn_wakil_ketua_1}}</td></tr>
+    </table>
+  </td>
+</tr>
+</table>
+</div>
+
 </body>
 </html>`
 }

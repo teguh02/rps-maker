@@ -458,12 +458,12 @@ export function getPreloadedTemplate(prodiKode: string, mkKode: string): Record<
     sks_p: '0',
     semester: mk.semester.toString(),
     dosen: '',
-    semester_akademik: '',
-    tgl_penyusunan: '',
-    pengembang_rps: '',
+    semester_akademik: getCurrentAcademicYear(),
+    tgl_penyusunan: getTodayDate(),
+    pengembang_rps: localStorage.getItem('rps-user-name') || '',
     koordinator_rmk: '',
-    kaprodi: '',
-    ketua_stikes: '',
+    kaprodi: localStorage.getItem('rps-kaprodi-override') || prodi.kaprodi,
+    ketua_stikes: localStorage.getItem('rps-ketua-stikes-override') || prodi.ketuaStikes,
     cpl: JSON.stringify(cplItems),
     cpmk: JSON.stringify(cpmkItems),
     sub_cpmk: JSON.stringify(subCpmkItems),
@@ -478,11 +478,11 @@ export function getPreloadedTemplate(prodiKode: string, mkKode: string): Record<
     ]),
     pustaka_utama: mk.pustakaUtama.join('\n'),
     pustaka_pendukung: mk.pustakaPendukung.join('\n'),
-    dosen_pengampu: '',
+    dosen_pengampu: localStorage.getItem('rps-user-name') || '',
     matakuliah_syarat: mk.matakuliahSyarat,
-    nidn_pengembang: '',
-    nidn_kaprodi: '',
-    nidn_ketua_stikes: '',
+    nidn_pengembang: localStorage.getItem('rps-user-nidn') || '',
+    nidn_kaprodi: prodi.nidnKaprodi,
+    nidn_ketua_stikes: prodi.nidnKetuaStikes,
     wakil_ketua_i: '',
     nidn_wakil_ketua_i: '',
     pertemuan: '[]',
@@ -521,6 +521,8 @@ export function getDefaultContentForProdi(prodiKode: string): Record<string, str
   // Override user overrides from localStorage (if set)
   const overrideKaprodi = localStorage.getItem('rps-kaprodi-override') || ''
   const overrideKetuaStikes = localStorage.getItem('rps-ketua-stikes-override') || ''
+  const userName = localStorage.getItem('rps-user-name') || ''
+  const userNidn = localStorage.getItem('rps-user-nidn') || ''
 
   // CPL prodi → StructuredList format
   const cplItems = (prodi?.cplProdi || []).map((c, idx) => {
@@ -534,6 +536,9 @@ export function getDefaultContentForProdi(prodiKode: string): Record<string, str
     semester_akademik: getCurrentAcademicYear(),
     semester: getCurrentSemester(),
     tgl_penyusunan: getTodayDate(),
+    pengembang_rps: userName,
+    nidn_pengembang: userNidn,
+    dosen_pengampu: userName,
     kaprodi: overrideKaprodi || prodi?.kaprodi || '',
     nidn_kaprodi: prodi?.nidnKaprodi || '',
     ketua_stikes: overrideKetuaStikes || prodi?.ketuaStikes || '',

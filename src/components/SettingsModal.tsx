@@ -3,6 +3,9 @@ import { XIcon, SettingsIcon } from './icons'
 
 const STORAGE_KEY_KAPRODI = 'rps-kaprodi-override'
 const STORAGE_KEY_KETUA = 'rps-ketua-stikes-override'
+const STORAGE_KEY_USER_NAME = 'rps-user-name'
+const STORAGE_KEY_USER_NIDN = 'rps-user-nidn'
+const STORAGE_KEY_USER_PRODI = 'rps-user-prodi'
 
 interface SettingsModalProps {
   open: boolean
@@ -10,12 +13,18 @@ interface SettingsModalProps {
 }
 
 export function SettingsModal({ open, onClose }: SettingsModalProps) {
+  const [userName, setUserName] = useState('')
+  const [userNidn, setUserNidn] = useState('')
+  const [userProdi, setUserProdi] = useState('')
   const [kaprodi, setKaprodi] = useState('')
   const [ketuaStikes, setKetuaStikes] = useState('')
   const [saved, setSaved] = useState(false)
 
   useEffect(() => {
     if (open) {
+      setUserName(localStorage.getItem(STORAGE_KEY_USER_NAME) || '')
+      setUserNidn(localStorage.getItem(STORAGE_KEY_USER_NIDN) || '')
+      setUserProdi(localStorage.getItem(STORAGE_KEY_USER_PRODI) || '')
       setKaprodi(localStorage.getItem(STORAGE_KEY_KAPRODI) || '')
       setKetuaStikes(localStorage.getItem(STORAGE_KEY_KETUA) || 'apt. Adi Susanto, M.Farm')
       setSaved(false)
@@ -25,6 +34,23 @@ export function SettingsModal({ open, onClose }: SettingsModalProps) {
   if (!open) return null
 
   const handleSave = () => {
+    // User identity
+    if (userName.trim()) {
+      localStorage.setItem(STORAGE_KEY_USER_NAME, userName.trim())
+    } else {
+      localStorage.removeItem(STORAGE_KEY_USER_NAME)
+    }
+    if (userNidn.trim()) {
+      localStorage.setItem(STORAGE_KEY_USER_NIDN, userNidn.trim())
+    } else {
+      localStorage.removeItem(STORAGE_KEY_USER_NIDN)
+    }
+    if (userProdi.trim()) {
+      localStorage.setItem(STORAGE_KEY_USER_PRODI, userProdi.trim())
+    } else {
+      localStorage.removeItem(STORAGE_KEY_USER_PRODI)
+    }
+    // Overrides
     if (kaprodi.trim()) {
       localStorage.setItem(STORAGE_KEY_KAPRODI, kaprodi.trim())
     } else {
@@ -40,8 +66,14 @@ export function SettingsModal({ open, onClose }: SettingsModalProps) {
   }
 
   const handleReset = () => {
+    localStorage.removeItem(STORAGE_KEY_USER_NAME)
+    localStorage.removeItem(STORAGE_KEY_USER_NIDN)
+    localStorage.removeItem(STORAGE_KEY_USER_PRODI)
     localStorage.removeItem(STORAGE_KEY_KAPRODI)
     localStorage.removeItem(STORAGE_KEY_KETUA)
+    setUserName('')
+    setUserNidn('')
+    setUserProdi('')
     setKaprodi('')
     setKetuaStikes('')
     setSaved(true)
@@ -62,9 +94,44 @@ export function SettingsModal({ open, onClose }: SettingsModalProps) {
         </div>
 
         <div className="settings-body">
+          {/* ── Data Diri Pengguna ── */}
           <p className="settings-desc">
-            Override nama default untuk kaprodi dan ketua STIKes.
-            Nilai ini digunakan saat membuat project baru dengan Prodi.
+            Data diri pengguna. Otomatis mengisi Dosen Pengampu dan Pengembang RPS saat membuat project baru.
+          </p>
+
+          <div className="settings-field">
+            <label>Nama Lengkap (beserta gelar)</label>
+            <input
+              type="text"
+              value={userName}
+              onChange={(e) => setUserName(e.target.value)}
+              placeholder="Contoh: Apt. Fulan, M.Farm"
+            />
+          </div>
+
+          <div className="settings-field">
+            <label>NIDN</label>
+            <input
+              type="text"
+              value={userNidn}
+              onChange={(e) => setUserNidn(e.target.value)}
+              placeholder="Contoh: 0612345678"
+            />
+          </div>
+
+          <div className="settings-field">
+            <label>Prodi</label>
+            <input
+              type="text"
+              value={userProdi}
+              onChange={(e) => setUserProdi(e.target.value)}
+              placeholder="Contoh: S1 Farmasi"
+            />
+          </div>
+
+          {/* ── Override Otorisasi ── */}
+          <p className="settings-desc" style={{ marginTop: '12px' }}>
+            Override nama default untuk Kaprodi dan Ketua STIKes.
           </p>
 
           <div className="settings-field">

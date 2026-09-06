@@ -30,7 +30,10 @@ type UpdateState =
 const DISMISSED_KEY = 'rps-dismissed-update'
 
 export function StartScreen({ onNew, onOpen, recentFiles, onOpenRecent, onClearRecent }: StartScreenProps) {
-  const [selectedProdi, setSelectedProdi] = useState('')
+  // Pre-select prodi from user settings if available
+  const userProdi = localStorage.getItem('rps-user-prodi') || ''
+  const matchedProdi = userProdi ? prodiData.find(p => p.nama === userProdi)?.kode || '' : ''
+  const [selectedProdi, setSelectedProdi] = useState(matchedProdi)
   const [selectedMK, setSelectedMK] = useState('')
   const [update, setUpdate] = useState<UpdateState>({ phase: 'idle' })
   const [updateError, setUpdateError] = useState('')
@@ -341,7 +344,7 @@ export function StartScreen({ onNew, onOpen, recentFiles, onOpenRecent, onClearR
             </section>
           </div>
 
-          <p className="ss-footer">v{APP_VERSION || '1.0.0'} — Dibuat untuk Dosen UNISINA · S1 Farmasi &amp; D3 Anafarma</p>
+          <p className="ss-footer">v{APP_VERSION || '1.0.0'} — Universitas Ibnu Sina Ajibarang</p>
         </div>
       </div>
 

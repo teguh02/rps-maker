@@ -38,8 +38,11 @@ td, th { vertical-align: middle; }
 
 /* ── Signature Page ── */
 .signature { page-break-before: always; width: 100%; }
-.signature table { border-collapse: collapse; width: 100%; }
-.signature td { padding: 2pt 4pt; font-size: 10pt; vertical-align: top; }
+.sig-table { width: 100%; border-collapse: collapse; border: 1pt solid black; font-size: 11pt; }
+.sig-table th, .sig-table td { border: 1pt solid black; padding: 8px; vertical-align: middle; }
+.sig-table .center { text-align: center; }
+.sig-table .right { text-align: right; }
+.sig-row-gap { height: 80px; }
 </style>
 </head>
 <body>
@@ -156,52 +159,60 @@ td, th { vertical-align: middle; }
 
 <!-- SIGNATURE PAGE -->
 <div class="signature">
-<table border="0" cellpadding="0" cellspacing="0" width="100%">
-<tr>
-  <td width="50%" style="padding-right:40pt;vertical-align:top;">
-    <table border="0" cellpadding="0" cellspacing="0" width="100%">
-      <tr><td style="border:none;padding:0;">Mengetahui,</td></tr>
-      <tr><td style="border:none;padding:0;height:60pt;"></td></tr>
-      <tr><td style="border:none;padding:0;border-bottom:1pt solid black;width:150pt;">&nbsp;</td></tr>
-      <tr><td style="border:none;padding:2pt 0;font-weight:bold;">Ketua Program Studi {{prodi}}</td></tr>
-      <tr><td style="border:none;padding:2pt 0;">{{kaprodi}}</td></tr>
-      <tr><td style="border:none;padding:2pt 0;">NIDN. {{nidn_kaprodi}}</td></tr>
-    </table>
-  </td>
-  <td width="50%" style="padding-left:40pt;vertical-align:top;">
-    <table border="0" cellpadding="0" cellspacing="0" width="100%">
-      <tr><td style="border:none;padding:0;">Mengetahui,</td></tr>
-      <tr><td style="border:none;padding:0;height:60pt;"></td></tr>
-      <tr><td style="border:none;padding:0;border-bottom:1pt solid black;width:150pt;">&nbsp;</td></tr>
-      <tr><td style="border:none;padding:2pt 0;font-weight:bold;">Ketua STIKes IBNU SINA AJIBARANG</td></tr>
-      <tr><td style="border:none;padding:2pt 0;">{{ketua_stikes}}</td></tr>
-      <tr><td style="border:none;padding:2pt 0;">NIDN. {{nidn_ketua_stikes}}</td></tr>
-    </table>
-  </td>
-</tr>
-<tr><td colspan="2" style="border:none;padding:30pt 0 0 0;"></td></tr>
-<tr>
-  <td width="50%" style="padding-right:40pt;vertical-align:top;">
-    <table border="0" cellpadding="0" cellspacing="0" width="100%">
-      <tr><td style="border:none;padding:0;">Ajibarang, {{tgl_penyusunan}}</td></tr>
-      <tr><td style="border:none;padding:0;height:60pt;"></td></tr>
-      <tr><td style="border:none;padding:0;border-bottom:1pt solid black;width:150pt;">&nbsp;</td></tr>
-      <tr><td style="border:none;padding:2pt 0;font-weight:bold;">Dosen Pengampu</td></tr>
-      <tr><td style="border:none;padding:2pt 0;">{{pengembang_rps}}</td></tr>
-      <tr><td style="border:none;padding:2pt 0;">NIDN. {{nidn_pengembang}}</td></tr>
-    </table>
-  </td>
-  <td width="50%" style="padding-left:40pt;vertical-align:top;">
-    <table border="0" cellpadding="0" cellspacing="0" width="100%">
-      <tr><td style="border:none;padding:0;">Mengetahui,</td></tr>
-      <tr><td style="border:none;padding:0;height:60pt;"></td></tr>
-      <tr><td style="border:none;padding:0;border-bottom:1pt solid black;width:150pt;">&nbsp;</td></tr>
-      <tr><td style="border:none;padding:2pt 0;font-weight:bold;">Wakil Ketua I</td></tr>
-      <tr><td style="border:none;padding:2pt 0;">{{wakil_ketua_1}}</td></tr>
-      <tr><td style="border:none;padding:2pt 0;">NIDN. {{nidn_wakil_ketua_1}}</td></tr>
-    </table>
-  </td>
-</tr>
+<table class="sig-table">
+  <!-- Baris 1: Tanggal -->
+  <tr>
+    <td colspan="2" class="right" style="border-bottom:none;">Ajibarang, {{tgl_penyusunan}}</td>
+  </tr>
+
+  <!-- Baris 2: Jabatan Atas -->
+  <tr>
+    <td class="center" style="border-top:none;border-bottom:none;">Kaprodi {{prodi}}</td>
+    <td class="center" style="border-top:none;border-bottom:none;">Dosen Pengampu</td>
+  </tr>
+
+  <!-- Baris 3: Tanda Tangan Atas -->
+  <tr>
+    <td style="border-top:none;border-bottom:none;"><div class="sig-row-gap"></div></td>
+    <td style="border-top:none;border-bottom:none;"><div class="sig-row-gap"></div></td>
+  </tr>
+
+  <!-- Baris 4: Nama & NIDN Atas -->
+  <tr>
+    <td class="center" style="border-top:none;">
+      <b>{{kaprodi}}</b><br>NIDN. {{nidn_kaprodi}}
+    </td>
+    <td class="center" style="border-top:none;">
+      <b>{{pengembang_rps}}</b><br>NIDN. {{nidn_pengembang}}
+    </td>
+  </tr>
+
+  <!-- Baris 5: Mengetahui -->
+  <tr>
+    <td colspan="2" class="center" style="border-top:1pt solid black;">Mengetahui,</td>
+  </tr>
+
+  <!-- Baris 6: Jabatan Bawah -->
+  <tr>
+    <td class="center" style="border-top:none;border-bottom:none;">Ketua STIKes Ibnu Sina Ajibarang</td>
+    <td class="center" style="border-top:none;border-bottom:none;">Wakil Ketua I Bidang Akademik</td>
+  </tr>
+
+  <!-- Baris 7: Tanda Tangan Bawah -->
+  <tr>
+    <td style="border-top:none;border-bottom:none;"><div class="sig-row-gap"></div></td>
+    <td style="border-top:none;border-bottom:none;"><div class="sig-row-gap"></div></td>
+  </tr>
+
+  <!-- Baris 8: Nama & NIDN Bawah -->
+  <tr>
+    <td class="center" style="border-top:none;">
+      <b>{{ketua_stikes}}</b><br>NIDN. {{nidn_ketua_stikes}}
+    </td>
+    <td class="center" style="border-top:none;">
+      <b>{{wakil_ketua_1}}</b><br>NIDN. {{nidn_wakil_ketua_1}}
+    </td>
+  </tr>
 </table>
 </div>
 

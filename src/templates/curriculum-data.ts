@@ -36,7 +36,7 @@ export const prodiData: ProdiData[] = [
     jenjang: 'S1',
     kaprodi: 'Dr. Apt. Endang Dwiyati, M.Si',
     nidnKaprodi: '0421068701',
-    ketuaStikes: 'Dr. H. Abdul Azis, S.KM., M.Kes',
+    ketuaStikes: 'apt. Adi Susanto, M.Farm',
     nidnKetuaStikes: '0430096002',
     cplProdi: [
       'CPL 1: Mahasiswa mampu memanfaatkan teknologi informasi serta mengintegrasikan ilmu dasar, ilmu kefarmasian, ilmu humaniora, dan kesehatan masyarakat guna mengembangkan dan menerapkan ilmu pengetahuan, teknologi, dan/atau seni guna memajukan kesejahteraan nasional dan menjadi warga dunia yang bertanggung jawab.',
@@ -245,7 +245,7 @@ export const prodiData: ProdiData[] = [
     jenjang: 'D3',
     kaprodi: 'Apt. Nuryani, M.Farm',
     nidnKaprodi: '0427078901',
-    ketuaStikes: 'Dr. H. Abdul Azis, S.KM., M.Kes',
+    ketuaStikes: 'apt. Adi Susanto, M.Farm',
     nidnKetuaStikes: '0430096002',
     cplProdi: [
       'CPL 1: Mahasiswa mampu menerapkan pengetahuan dasar analisis dan teknik fisikokimia dalam pengujian sediaan farmasi.',

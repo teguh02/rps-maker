@@ -9,7 +9,7 @@
  * rendered in an <iframe> for preview or printed via Electron printToPDF.
  */
 
-import { buildRpsFromTemplate } from './rpsDataMapper'
+import { buildRpsFromTemplate, initLogo } from './rpsDataMapper'
 
 export interface RpsContent {
   [key: string]: string
@@ -75,3 +75,5 @@ export function sanitizeRich(html: string): string {
 export function buildRpsHtml(content: RpsContent): string {
   return buildRpsFromTemplate(content)
 }
+
+export { initLogo }

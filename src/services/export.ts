@@ -26,7 +26,7 @@ import {
   ImageRun,
 } from 'docx'
 import { logger } from '../utils/logger'
-import { buildRpsHtml, fullDate } from './rpsDocument'
+import { buildRpsHtml, fullDate, initLogo } from './rpsDocument'
 import logoUrl from '../assets/logo-unisina.png?url'
 
 export interface ExportData {
@@ -642,6 +642,7 @@ export async function exportDocx(data: ExportData, filePath: string): Promise<vo
 export async function exportPdf(data: ExportData, filePath: string): Promise<void> {
   const startTime = Date.now()
   logger.info('EXPORT', 'export.pdf_start')
+  await initLogo()
   const html = buildRpsHtml(data.content)
   const ok = await window.electronAPI.exportPdfHtml(filePath, html)
   if (!ok) {

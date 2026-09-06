@@ -262,15 +262,41 @@ export function buildRpsFromTemplate(content: Record<string, string>): string {
   return html
 }
 
-/** Load logo as base64 data URI. */
-function getLogoBase64(): string {
-  try {
-    // @ts-ignore — Vite inlines this as a base64 data URL
-    return logoUrl
-  } catch {
-    return ''
-  }
-}
-
 // Vite raw import for the logo
 import logoUrl from '../assets/logo-unisina.png?url'
+
+/** Load logo as base64 data URI. */
+let _logoCache: string | null = null
+let _logoLoading: Promise<string> | null = null
+
+function getLogoBase64(): string {
+  return _logoCache || ''
+}
+
+async function initLogo(): Promise<string> {
+  if (_logoCache) return _logoCache
+  if (_logoLoading) return _logoLoading
+  _logoLoading = (async () => {
+    try {
+      const res = await fetch(logoUrl)
+      const blob = await res.blob()
+      const dataUrl = await new Promise<string>((resolve) => {
+        const reader = new FileReader()
+        reader.onloadend = () => resolve(reader.result as string)
+        reader.onerror = () => resolve('')
+        reader.readAsDataURL(blob)
+      })
+      _logoCache = dataUrl
+      return dataUrl
+    } catch {
+      _logoCache = ''
+      return ''
+    }
+  })()
+  return _logoLoading
+}
+
+// Eagerly load logo on module init
+initLogo()
+
+export { initLogo }

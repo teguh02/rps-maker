@@ -3,6 +3,7 @@ import type { Project } from '../App'
 import { Ribbon } from './Ribbon'
 import { RTE } from './RTE'
 import { ShortcutsDialog } from './ShortcutsDialog'
+import { AboutModal } from './AboutModal'
 import { guideSections } from './GuidePage'
 import { ArrowUpIcon, ArrowDownIcon, TrashIcon } from './icons'
 import { isAIConfigured, generateWithAI, getSectionPrompt } from '../services/ai'
@@ -68,6 +69,7 @@ export function Editor({ project, onUpdate, onSave, onExport, onOpenAISettings, 
   const [currentContent, setCurrentContent] = useState<string>(JSON.stringify(project.content))
   const [contextMenu, setContextMenu] = useState<{ x: number; y: number } | null>(null)
   const [showShortcuts, setShowShortcuts] = useState(false)
+  const [showAbout, setShowAbout] = useState(false)
   const [isFullscreen, setIsFullscreen] = useState(true) // starts maximized
 
   const handleToggleFullscreen = async () => {
@@ -727,6 +729,7 @@ export function Editor({ project, onUpdate, onSave, onExport, onOpenAISettings, 
         isFullscreen={isFullscreen}
         onToggleFullscreen={handleToggleFullscreen}
         onShowShortcuts={() => setShowShortcuts(true)}
+        onShowAbout={() => setShowAbout(true)}
       />
 
       <div className="flex-1 overflow-y-auto bg-[#e8e8e8] flex flex-col items-center">
@@ -1250,6 +1253,7 @@ export function Editor({ project, onUpdate, onSave, onExport, onOpenAISettings, 
 
       {/* Keyboard shortcuts reference */}
       <ShortcutsDialog open={showShortcuts} onClose={() => setShowShortcuts(false)} />
+      <AboutModal open={showAbout} onClose={() => setShowAbout(false)} />
     </div>
   )
 }

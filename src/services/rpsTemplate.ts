@@ -11,10 +11,10 @@ export function getRpsTemplate(): string {
 <meta http-equiv="Content-Type" content="text/html; charset=utf-8">
 <style>
 * { box-sizing: border-box; }
-@page { size: A4 landscape; margin: 1.5cm; }
-@page cover { size: A4 portrait; margin: 2cm; }
-@page signature { size: A4 landscape; margin: 1.5cm; }
-body { font-family: 'Times New Roman', Times, serif; font-size: 11pt; margin: 0; padding: 16px 24px; color: #000; width: 100%; }
+@page { size: A4 landscape; margin: 1cm; }
+@page cover { size: A4 portrait; margin: 1.5cm; }
+@page signature { size: A4 landscape; margin: 1cm; }
+body { font-family: 'Times New Roman', Times, serif; font-size: 11pt; margin: 0; padding: 8px 12px; color: #000; width: 100%; }
 td, th { vertical-align: middle; }
 
 /* ── Cover Page ── */

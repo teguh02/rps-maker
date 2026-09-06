@@ -576,8 +576,8 @@ function buildDocx(c: Record<string, string>, logoData: string | null): Document
     title: `RPS ${mk}`,
     styles: { default: { document: { run: { font: FONT_TWIPS, size: 21 } } } },
     sections: [
-      { properties: { page: { size: { orientation: 'portrait' } } }, children: coverChildren },
-      { properties: { page: { size: { orientation: 'landscape' } } }, children: contentChildren },
+      { properties: { page: { size: { orientation: 'portrait' }, margin: { top: 850, bottom: 850, left: 850, right: 850 } } }, children: coverChildren },
+      { properties: { page: { size: { orientation: 'landscape' }, margin: { top: 567, bottom: 567, left: 567, right: 567 } } }, children: contentChildren },
     ],
   })
 }

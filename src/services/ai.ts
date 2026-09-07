@@ -175,6 +175,7 @@ function getMasterBerkasContext(): { hasContext: boolean; contextBlock: string; 
 
 export function getSectionPrompt(section: string, content: Record<string, string>): GenerateOptions {
   const mb = getMasterBerkasContext()
+  const customCommand = (content.custom_command_ai || '').trim()
 
   const base = `Anda adalah ahli kurikulum pendidikan tinggi di Indonesia yang mengkhususkan diri dalam Rencana Pembelajaran Semester (RPS) berbasis Outcome-Based Education (OBE).
 Anda harus merespons dalam Bahasa Indonesia dengan format yang diminta.
@@ -183,7 +184,7 @@ Panduan penting:
 - CPMK harus terukur dan menggunakan KKO Taksonomi Bloom
 - Gunakan metode Student-Centered Learning (Case Method, Team-Based Project)
 - Untuk IKU 7: minimal 40% mata kuliah harus partisipatif dengan bobot minimal 50%
-- Referensi harus terkini (5 tahun terakhir)${mb.contextBlock}`
+- Referensi harus terkini (5 tahun terakhir)${mb.contextBlock}${customCommand ? `\n\nINSTRUKSI TAMBAHAN DARI PENGGUNA:\n${customCommand}` : ''}`
 
   const c = content
 

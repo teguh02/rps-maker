@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react'
-import { BackIcon, PlusIcon, TrashIcon, SaveIcon, FileIcon, XIcon, PreviewIcon } from './icons'
+import { BackIcon, PlusIcon, TrashIcon, SaveIcon, FileIcon, XIcon, PreviewIcon, InfoIcon } from './icons'
 
 interface MasterBerkasDocument {
   id: string
@@ -61,6 +61,7 @@ export function MasterBerkasPage({ onBack }: MasterBerkasPageProps) {
   const [viewingDoc, setViewingDoc] = useState<MasterBerkasDocument | null>(null)
   const [confirmDeleteGroup, setConfirmDeleteGroup] = useState<string | null>(null)
   const [confirmDeleteDoc, setConfirmDeleteDoc] = useState<string | null>(null)
+  const [showInfoDialog, setShowInfoDialog] = useState(false)
   const fileInputRef = useRef<HTMLInputElement>(null)
 
   useEffect(() => {
@@ -234,6 +235,9 @@ export function MasterBerkasPage({ onBack }: MasterBerkasPageProps) {
         <div style={{ width: 1, height: 20, background: '#e0e0e0' }} />
         <h1 className="mk-header-title">Master Berkas</h1>
         <span className="mk-header-sub">Dokumen referensi untuk AI</span>
+        <button className="mk-header-info" onClick={() => setShowInfoDialog(true)}>
+          <InfoIcon size={14} />
+        </button>
       </div>
 
       <div className="mk-body">
@@ -575,6 +579,62 @@ export function MasterBerkasPage({ onBack }: MasterBerkasPageProps) {
           </div>
         )
       })()}
+
+      {/* Info Dialog */}
+      {showInfoDialog && (
+        <div className="mk-dialog-overlay" onClick={() => setShowInfoDialog(false)}>
+          <div className="mk-dialog mk-dialog-wide" onClick={(e) => e.stopPropagation()}>
+            <div className="mk-dialog-title">
+              <span>Tentang Master Berkas</span>
+              <button className="mk-dialog-close" onClick={() => setShowInfoDialog(false)}>
+                <XIcon size={18} />
+              </button>
+            </div>
+            <div className="mk-info-content">
+              <div className="mk-info-col">
+                <div className="mk-info-section">
+                  <div className="mk-info-label">Jenis berkas yang didukung</div>
+                  <div className="mk-info-items">
+                    <span className="mk-info-badge mk-info-badge-pdf">PDF</span>
+                    <span className="mk-info-badge mk-info-badge-docx">DOCX</span>
+                    <span className="mk-info-badge mk-info-badge-xlsx">XLSX</span>
+                    <span className="mk-info-badge mk-info-badge-csv">CSV</span>
+                  </div>
+                </div>
+                <div className="mk-info-section">
+                  <div className="mk-info-label">Contoh dokumen yang bisa diunggah</div>
+                  <ul className="mk-info-list">
+                    <li>Kurikulum program studi (SK, Capaian Pembelajaran)</li>
+                    <li>Silabus mata kuliah</li>
+                    <li>RPS semester lama</li>
+                    <li>Daftar pustaka referensi</li>
+                    <li>Pedoman penulisan / dokumen akademik lainnya</li>
+                  </ul>
+                </div>
+              </div>
+              <div className="mk-info-divider" />
+              <div className="mk-info-col">
+                <div className="mk-info-section">
+                  <div className="mk-info-label">Mengapa perlu mengunggah dokumen?</div>
+                  <div className="mk-info-desc">
+                    <p>
+                      Saat AI mengisi otomatis bagian RPS (CPL, CPMK, Bahan Kajian, dll), dokumen yang diunggah akan dimasukkan sebagai referensi dalam prompt AI. Ini seperti <strong>simple embedding system</strong> — teks dari dokumen diekstrak, lalu disertakan agar AI menghasilkan konten yang relevan dengan kurikulum dan kebijakan kampus Anda.
+                    </p>
+                    <p style={{ marginTop: 8 }}>
+                      Tanpa dokumen referensi, AI hanya mengandalkan data umum. Dengan dokumen, hasilnya lebih akurat dan sesuai dengan standar program studi.
+                    </p>
+                  </div>
+                </div>
+              </div>
+            </div>
+            <div className="mk-dialog-actions">
+              <button className="mk-dialog-confirm" onClick={() => setShowInfoDialog(false)}>
+                Mengerti
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Document Content Viewer */}
       {viewingDoc && (

@@ -215,7 +215,10 @@ Panduan penting:
 
 Mata Kuliah: ${plain('mata_kuliah')} (T=${plain('sks_t')} P=${plain('sks_p')})
 ${mb.hasContext ? `\nDokumen referensi tersedia: ${mb.docNames.join(', ')}. Gunakan kurikulum/silabus dari dokumen referensi sebagai dasar utama. Sesuaikan CPL dengan capaian yang tercantum dalam dokumen.` : ''}
-CPL harus spesifik, terukur, dan menggunakan kata kerja operasional Taksonomi Bloom. Buat 4 CPL. Kembalikan HANYA JSON array, tanpa penjelasan tambahan.`,
+CPL harus spesifik, terukur, dan menggunakan kata kerja operasional Taksonomi Bloom. Buat 4 CPL. Kembalikan HANYA JSON array, tanpa penjelasan tambahan.
+
+Contoh format CPL yang benar:
+[{"label":"CPL-1","deskripsi":"Mahasiswa mampu memanfaatkan teknologi informasi serta mengintegrasikan ilmu dasar, ilmu kefarmasian, ilmu humaniora, dan kesehatan masyarakat guna membentuk pemahaman yang menyeluruh terhadap ilmu dan praktik kefarmasian"},{"label":"CPL-2","deskripsi":"Mahasiswa mampu mengimplementasikan konsep pengembangan, penjaminan mutu, dan pengujian kualitas sediaan farmasi, alat kesehatan, serta perbekalan kesehatan lainnya sesuai dengan ketentuan peraturan yang berlaku"}]`,
       }
     case 'cpmk':
       return {
@@ -226,7 +229,10 @@ CPL harus spesifik, terukur, dan menggunakan kata kerja operasional Taksonomi Bl
 CPL Program Studi:
 ${list('cpl') || 'Belum diisi'}
 ${mb.hasContext ? `\nDokumen referensi tersedia: ${mb.docNames.join(', ')}. Sesuaikan CPMK dengan deskripsi mata kuliah dan tujuan pembelajaran dari dokumen referensi.` : ''}
-Buat 4 CPMK dengan KKO Bloom yang beragam (misalnya: Memahami C2, Menganalisis C4, Mencipta C6). Setiap CPMK harus spesifik dan terukur. Kembalikan HANYA JSON array, tanpa penjelasan tambahan.`,
+Buat 4 CPMK dengan KKO Bloom yang beragam (misalnya: Memahami C2, Menganalisis C4, Mencipta C6). Setiap CPMK harus spesifik dan terukur. Kembalikan HANYA JSON array, tanpa penjelasan tambahan.
+
+Contoh format CPMK yang benar:
+[{"label":"CPMK-1","deskripsi":"Mahasiswa mampu mengidentifikasi tanaman obat dan kandungan metabolit sekundernya."},{"label":"CPMK-2","deskripsi":"Mahasiswa mampu menjelaskan patofisiologi dan penatalaksanaan farmakoterapi penyakit kronis."},{"label":"CPMK-3","deskripsi":"Mahasiswa mampu merancang terapi berbasis bukti dan pedoman nasional."},{"label":"CPMK-4","deskripsi":"Mahasiswa mampu mengevaluasi dan menyusun laporan terapi berbasis studi kasus."}]`,
       }
     case 'sub_cpmk':
       return {
@@ -237,7 +243,10 @@ Buat 4 CPMK dengan KKO Bloom yang beragam (misalnya: Memahami C2, Menganalisis C
 CPMK:
 ${list('cpmk') || 'Belum diisi'}
 ${mb.hasContext ? `\nDokumen referensi tersedia: ${mb.docNames.join(', ')}. Gunakan struktur pembahasan/urutan materi dari dokumen referensi sebagai panduan pemecahan CPMK.` : ''}
-Format Sub-CPMK gunakan notasi desimal (Sub-CPMK 1.1, 1.2, 2.1, dst). Buat minimal 8 Sub-CPMK. Kembalikan HANYA JSON array, tanpa penjelasan tambahan.`,
+Format Sub-CPMK gunakan notasi desimal (Sub-CPMK 1.1, 1.2, 2.1, dst). Buat minimal 8 Sub-CPMK. Kembalikan HANYA JSON array, tanpa penjelasan tambahan.
+
+Contoh format Sub-CPMK yang benar:
+[{"label":"Sub-CPMK1.1","deskripsi":"Mahasiswa mampu menjelaskan patofisiologi osteoporosis, artritis reumatoid, gout, diabetes melitus, hipotiroidisme, dan hipertiroidisme."},{"label":"Sub-CPMK1.2","deskripsi":"Mahasiswa mampu mengidentifikasi faktor risiko, etiologi, dan manifestasi klinis penyakit kronis pada sistem tulang, sendi, dan hormonal."},{"label":"Sub-CPMK2.1","deskripsi":"Mahasiswa mampu menelusuri dan menginterpretasi pedoman nasional serta literatur ilmiah terkait terapi penyakit kronis."},{"label":"Sub-CPMK2.2","deskripsi":"Mahasiswa mampu merancang rencana terapi farmakologis berbasis bukti untuk kasus osteoporosis, AR, gout, diabetes melitus, dan gangguan tiroid."}]`,
       }
     case 'deskripsi_mk':
       return {
@@ -248,7 +257,11 @@ Format Sub-CPMK gunakan notasi desimal (Sub-CPMK 1.1, 1.2, 2.1, dst). Buat minim
 Cakupan materi:
 ${list('bahan_kajian') || 'Belum diisi'}
 ${mb.hasContext ? `\nDokumen referensi tersedia: ${mb.docNames.join(', ')}. Gunakan deskripsi mata kuliah dari dokumen referensi sebagai dasar. Pertahankan cakupan dan terminologi yang sama.` : ''}
-Deskripsi harus menjelaskan relevansi, cakupan materi, dan posisi mata kuliah dalam kurikulum program studi.`,
+Deskripsi harus menjelaskan relevansi, cakupan materi, dan posisi mata kuliah dalam kurikulum program studi.
+
+Contoh format deskripsi yang benar:
+"Mata kuliah Farmakoterapi 1 (Tulang, Sendi, dan Hormonal) mempelajari prinsip patofisiologi, penatalaksanaan, dan pemilihan terapi obat pada penyakit kronis yang berkaitan dengan sistem tulang, sendi, dan hormonal, meliputi osteoporosis, artritis reumatoid, gout, diabetes melitus tipe 1 dan 2, serta gangguan tiroid. Perkuliahan menekankan pada perancangan terapi berbasis pedoman nasional dan bukti ilmiah, pemantauan efektivitas dan keamanan terapi, serta identifikasi dan penyelesaian Drug Related Problems (DRPs)."
+"Mata kuliah ini membahas konsep dasar, ruang lingkup, serta manfaat farmakognosi dan fitokimia. Cakupan materi meliputi pembuatan dan kontrol kualitas simplisia, identifikasi metabolit primer dan sekunder, skrining fitokimia, serta teknik ekstraksi, pemisahan, isolasi, dan pemurnian senyawa aktif dari bahan alam."`,
       }
     case 'bahan_kajian':
       return {
@@ -259,7 +272,10 @@ Deskripsi harus menjelaskan relevansi, cakupan materi, dan posisi mata kuliah da
 CPMK:
 ${list('cpmk') || 'Belum diisi'}
 ${mb.hasContext ? `\nDokumen referensi tersedia: ${mb.docNames.join(', ')}. Sesuaikan bahan kajian dengan daftar materi/bab yang tercantum dalam dokumen referensi.` : ''}
-Buat 8 bahan kajian yang mencakup konsep dasar hingga aplikasi. Kembalikan HANYA JSON array, tanpa penjelasan tambahan.`,
+Buat 8 bahan kajian yang mencakup konsep dasar hingga aplikasi. Kembalikan HANYA JSON array, tanpa penjelasan tambahan.
+
+Contoh format bahan kajian yang benar (judul topik singkat, bukan kalimat panjang):
+[{"label":"1","deskripsi":"Konsep dasar farmakoterapi penyakit kronis dan evidence-based medicine"},{"label":"2","deskripsi":"Patofisiologi dan diagnosis penyakit tulang (osteoporosis)"},{"label":"3","deskripsi":"Patofisiologi dan farmakoterapi penyakit sendi (artritis reumatoid dan gout)"},{"label":"4","deskripsi":"Patofisiologi dan farmakoterapi penyakit hormonal (diabetes melitus, hipotiroidisme, hipertiroidisme)"},{"label":"5","deskripsi":"Mekanisme kerja, pemilihan, dan perancangan regimen terapi berbasis pedoman nasional"},{"label":"6","deskripsi":"Individualisasi terapi pada pasien dengan komorbid dan populasi khusus"},{"label":"7","deskripsi":"Keamanan terapi: efek samping, interaksi obat, dan Drug Related Problems (DRPs)"},{"label":"8","deskripsi":"Monitoring dan evaluasi efektivitas serta keamanan terapi berbasis parameter klinis dan laboratoris"}]`,
       }
     case 'penilaian':
       return {
@@ -274,7 +290,10 @@ Buat komponen penilaian dengan:
 1. Komponen penilaian (Kehadiran, Partisipasi, Tugas, UTS, UAS, dll.)
 2. Bobot persentase per komponen (total harus 100%)
 
-Untuk pemenuhan IKU 7, bobot asesmen partisipatif (kehadiran + partisipasi + tugas) minimal 50%. Kembalikan HANYA JSON array, tanpa penjelasan tambahan.`,
+Untuk pemenuhan IKU 7, bobot asesmen partisipatif (kehadiran + partisipasi + tugas) minimal 50%. Kembalikan HANYA JSON array, tanpa penjelasan tambahan.
+
+Contoh format penilaian yang benar (total harus 100):
+[{"item":"Kehadiran","bobot":5},{"item":"Partisipasi","bobot":5},{"item":"Tugas/CBL/PBL","bobot":20},{"item":"UTS","bobot":35},{"item":"UAS","bobot":35}]`,
       }
     case 'pustaka':
       return {
@@ -288,7 +307,10 @@ Buat 2 kategori:
 ${mb.hasContext ? `\nDokumen referensi tersedia: ${mb.docNames.join(', ')}. Gunakan daftar pustaka/referensi dari dokumen yang diunggah sebagai pustaka utama. Tambahkan jika kurang.` : ''}
 Referensi harus terkini (5 tahun terakhir, 2020-2026). Format: Nama Penulis. (Tahun). Judul. Penerbit/ISSN.
 
-Kembalikan HANYA JSON, tanpa penjelasan tambahan.`,
+Kembalikan HANYA JSON, tanpa penjelasan tambahan.
+
+Contoh format pustaka yang benar (gaya APA 7th edition):
+{"pustaka_utama":"DiPiro, J. T., Yee, G. C., Posey, L. M., Haines, S. T., Nolin, T. D., & Ellingrod, V. (2023). Pharmacotherapy: A Pathophysiologic Approach (12th ed.). New York: McGraw-Hill Education.\nBrunton, L. L., Hilal-Dandan, R., & Knollmann, B. C. (2023). Goodman & Gilman's The Pharmacological Basis of Therapeutics (14th ed.). New York: McGraw-Hill Education.","pustaka_pendukung":"Katzung, B. G., & Trevor, A. J. (2021). Basic & Clinical Pharmacology (15th ed.). New York: McGraw-Hill Education.\nKementerian Kesehatan Republik Indonesia. (2019). Pedoman Nasional Pelayanan Kedokteran Diabetes Melitus Tipe 2. Jakarta: Kementerian Kesehatan RI."}`,
       }
     default:
       return {

@@ -24,6 +24,10 @@ contextBridge.exposeInMainWorld('electronAPI', {
   onMenuImport: (callback) => { ipcRenderer.on('menu-import', callback); return () => ipcRenderer.removeListener('menu-import', callback); },
   onOpenAISettings: (callback) => { ipcRenderer.on('open-ai-settings', callback); return () => ipcRenderer.removeListener('open-ai-settings', callback); },
 
+  masterBerkasLoad: () => ipcRenderer.invoke('master-berkas:load'),
+  masterBerkasSave: (data) => ipcRenderer.invoke('master-berkas:save', data),
+  masterBerkasExtract: (options) => ipcRenderer.invoke('master-berkas:extract', options),
+
   checkForUpdates: (force) => ipcRenderer.invoke('updates:check', force),
   installUpdate: () => ipcRenderer.invoke('updates:install'),
   onUpdateProgress: (callback) => { const listener = (_e, data) => callback(data); ipcRenderer.on('updates:download-progress', listener); return () => ipcRenderer.removeListener('updates:download-progress', listener); },

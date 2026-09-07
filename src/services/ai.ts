@@ -3,6 +3,8 @@
 import { logger } from '../utils/logger'
 import { stripHtml } from '../utils/html'
 
+const MASTER_BERKAS_KEY = 'rps-master-berkas-active-group'
+
 interface AISettings {
   provider: 'free' | 'custom'
   apiHost: string
@@ -147,7 +149,33 @@ export async function generateWithAI(options: GenerateOptions): Promise<string> 
 }
 
 // Prompt templates per section
+
+function getMasterBerkasContext(): { hasContext: boolean; contextBlock: string; docNames: string[] } {
+  const activeGroupId = localStorage.getItem(MASTER_BERKAS_KEY)
+  if (!activeGroupId) return { hasContext: false, contextBlock: '', docNames: [] }
+  try {
+    const rawData = localStorage.getItem('rps-master-berkas-data')
+    if (!rawData) return { hasContext: false, contextBlock: '', docNames: [] }
+    const parsed = JSON.parse(rawData)
+    const group = parsed.groups?.find((g: { id: string }) => g.id === activeGroupId)
+    if (!group?.documents?.length) return { hasContext: false, contextBlock: '', docNames: [] }
+    const docNames = group.documents.map((d: { name: string }) => d.name)
+    const contextParts = group.documents.map((doc: { name: string; extractedText: string }) =>
+      `[${doc.name}]\n${doc.extractedText}`
+    )
+    return {
+      hasContext: true,
+      contextBlock: `\n\nKONTEKS MASTER BERKAS:\nBerikut adalah dokumen referensi yang telah diunggah oleh pengguna:\n---\n${contextParts.join('\n\n')}\n---`,
+      docNames,
+    }
+  } catch {
+    return { hasContext: false, contextBlock: '', docNames: [] }
+  }
+}
+
 export function getSectionPrompt(section: string, content: Record<string, string>): GenerateOptions {
+  const mb = getMasterBerkasContext()
+
   const base = `Anda adalah ahli kurikulum pendidikan tinggi di Indonesia yang mengkhususkan diri dalam Rencana Pembelajaran Semester (RPS) berbasis Outcome-Based Education (OBE).
 Anda harus merespons dalam Bahasa Indonesia dengan format yang diminta.
 
@@ -155,7 +183,7 @@ Panduan penting:
 - CPMK harus terukur dan menggunakan KKO Taksonomi Bloom
 - Gunakan metode Student-Centered Learning (Case Method, Team-Based Project)
 - Untuk IKU 7: minimal 40% mata kuliah harus partisipatif dengan bobot minimal 50%
-- Referensi harus terkini (5 tahun terakhir)`
+- Referensi harus terkini (5 tahun terakhir)${mb.contextBlock}`
 
   const c = content
 
@@ -186,7 +214,7 @@ Panduan penting:
         userPrompt: `Buat CPL (Capaian Pembelajaran Lulusan) yang relevan untuk program studi "${plain('prodi')}" di bawah Rumpun MK "${plain('rumpun_mk')}".
 
 Mata Kuliah: ${plain('mata_kuliah')} (T=${plain('sks_t')} P=${plain('sks_p')})
-
+${mb.hasContext ? `\nDokumen referensi tersedia: ${mb.docNames.join(', ')}. Gunakan kurikulum/silabus dari dokumen referensi sebagai dasar utama. Sesuaikan CPL dengan capaian yang tercantum dalam dokumen.` : ''}
 CPL harus spesifik, terukur, dan menggunakan kata kerja operasional Taksonomi Bloom. Buat 4 CPL. Kembalikan HANYA JSON array, tanpa penjelasan tambahan.`,
       }
     case 'cpmk':
@@ -197,7 +225,7 @@ CPL harus spesifik, terukur, dan menggunakan kata kerja operasional Taksonomi Bl
 
 CPL Program Studi:
 ${list('cpl') || 'Belum diisi'}
-
+${mb.hasContext ? `\nDokumen referensi tersedia: ${mb.docNames.join(', ')}. Sesuaikan CPMK dengan deskripsi mata kuliah dan tujuan pembelajaran dari dokumen referensi.` : ''}
 Buat 4 CPMK dengan KKO Bloom yang beragam (misalnya: Memahami C2, Menganalisis C4, Mencipta C6). Setiap CPMK harus spesifik dan terukur. Kembalikan HANYA JSON array, tanpa penjelasan tambahan.`,
       }
     case 'sub_cpmk':
@@ -208,7 +236,7 @@ Buat 4 CPMK dengan KKO Bloom yang beragam (misalnya: Memahami C2, Menganalisis C
 
 CPMK:
 ${list('cpmk') || 'Belum diisi'}
-
+${mb.hasContext ? `\nDokumen referensi tersedia: ${mb.docNames.join(', ')}. Gunakan struktur pembahasan/urutan materi dari dokumen referensi sebagai panduan pemecahan CPMK.` : ''}
 Format Sub-CPMK gunakan notasi desimal (Sub-CPMK 1.1, 1.2, 2.1, dst). Buat minimal 8 Sub-CPMK. Kembalikan HANYA JSON array, tanpa penjelasan tambahan.`,
       }
     case 'deskripsi_mk':
@@ -219,7 +247,7 @@ Format Sub-CPMK gunakan notasi desimal (Sub-CPMK 1.1, 1.2, 2.1, dst). Buat minim
 
 Cakupan materi:
 ${list('bahan_kajian') || 'Belum diisi'}
-
+${mb.hasContext ? `\nDokumen referensi tersedia: ${mb.docNames.join(', ')}. Gunakan deskripsi mata kuliah dari dokumen referensi sebagai dasar. Pertahankan cakupan dan terminologi yang sama.` : ''}
 Deskripsi harus menjelaskan relevansi, cakupan materi, dan posisi mata kuliah dalam kurikulum program studi.`,
       }
     case 'bahan_kajian':
@@ -230,7 +258,7 @@ Deskripsi harus menjelaskan relevansi, cakupan materi, dan posisi mata kuliah da
 
 CPMK:
 ${list('cpmk') || 'Belum diisi'}
-
+${mb.hasContext ? `\nDokumen referensi tersedia: ${mb.docNames.join(', ')}. Sesuaikan bahan kajian dengan daftar materi/bab yang tercantum dalam dokumen referensi.` : ''}
 Buat 8 bahan kajian yang mencakup konsep dasar hingga aplikasi. Kembalikan HANYA JSON array, tanpa penjelasan tambahan.`,
       }
     case 'penilaian':
@@ -241,7 +269,7 @@ Buat 8 bahan kajian yang mencakup konsep dasar hingga aplikasi. Kembalikan HANYA
 
 CPMK:
 ${list('cpmk') || 'Belum diisi'}
-
+${mb.hasContext ? `\nDokumen referensi tersedia: ${mb.docNames.join(', ')}. Gunakan format/rubrik penilaian dari dokumen referensi jika tersedia. Pertahankan komponen dan bobot yang ada.` : ''}
 Buat komponen penilaian dengan:
 1. Komponen penilaian (Kehadiran, Partisipasi, Tugas, UTS, UAS, dll.)
 2. Bobot persentase per komponen (total harus 100%)
@@ -257,7 +285,7 @@ Untuk pemenuhan IKU 7, bobot asesmen partisipatif (kehadiran + partisipasi + tug
 Buat 2 kategori:
 1. Pustaka Utama: Buku teks utama yang digunakan (minimal 2)
 2. Pustaka Pendukung: Jurnal, buku referensi tambahan
-
+${mb.hasContext ? `\nDokumen referensi tersedia: ${mb.docNames.join(', ')}. Gunakan daftar pustaka/referensi dari dokumen yang diunggah sebagai pustaka utama. Tambahkan jika kurang.` : ''}
 Referensi harus terkini (5 tahun terakhir, 2020-2026). Format: Nama Penulis. (Tahun). Judul. Penerbit/ISSN.
 
 Kembalikan HANYA JSON, tanpa penjelasan tambahan.`,
@@ -266,7 +294,7 @@ Kembalikan HANYA JSON, tanpa penjelasan tambahan.`,
       return {
         section,
         systemPrompt: base,
-        userPrompt: `Generate konten untuk bagian ${section} dari RPS mata kuliah "${plain('mata_kuliah')}" dalam format yang sesuai.`,
+        userPrompt: `Generate konten untuk bagian ${section} dari RPS mata kuliah "${plain('mata_kuliah')}" dalam format yang sesuai.${mb.hasContext ? `\n\nGunakan dokumen referensi (${mb.docNames.join(', ')}) sebagai panduan utama.` : ''}`,
       }
   }
 }

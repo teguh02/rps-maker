@@ -21,6 +21,7 @@ interface EditorProps {
   onGoHome?: () => void
   onOpenGuide?: (section: string) => void
   onPreview?: () => void
+  onOpenMasterBerkas?: () => void
   autoSaveActive?: boolean
   lastAutoSaveAt?: string | null
   showToast?: (message: string, type?: 'info' | 'warning' | 'error') => void
@@ -53,7 +54,7 @@ interface PertemuanSpecial {
 
 type PertemuanRow = PertemuanItem | PertemuanSpecial
 
-export function Editor({ project, onUpdate, onSave, onExport, onOpenAISettings, onGoHome, onOpenGuide, onPreview, autoSaveActive, lastAutoSaveAt, showToast }: EditorProps) {
+export function Editor({ project, onUpdate, onSave, onExport, onOpenAISettings, onGoHome, onOpenGuide, onPreview, onOpenMasterBerkas, autoSaveActive, lastAutoSaveAt, showToast }: EditorProps) {
   const [activeSection, setActiveSection] = useState('identitas')
   const [aiLoading, setAiLoading] = useState(false)
   const [aiError, setAiError] = useState('')
@@ -546,6 +547,7 @@ export function Editor({ project, onUpdate, onSave, onExport, onOpenAISettings, 
         onToggleFullscreen={handleToggleFullscreen}
         onShowShortcuts={() => setShowShortcuts(true)}
         onShowAbout={() => setShowAbout(true)}
+        onOpenMasterBerkas={onOpenMasterBerkas}
       />
 
       <div className="flex-1 overflow-y-auto bg-[#e8e8e8] flex flex-col items-center">

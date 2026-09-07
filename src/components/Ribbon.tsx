@@ -35,6 +35,7 @@ interface RibbonProps {
   activeSection?: string
   onGenerateAI?: () => void
   aiLoading?: boolean
+  onOpenMasterBerkas?: () => void
 }
 
 type TabId = 'file' | 'home' | 'ai' | 'view' | 'help'
@@ -68,6 +69,7 @@ export function Ribbon({
   onSave, onExport, onOpenAISettings, onGoHome, activeSection, onGenerateAI, aiLoading,
   onCut, onCopy, onPaste, onUndo, onRedo, canUndo, canRedo,
   onZoomIn, onZoomOut, onZoomReset, onPreview, isFullscreen, onToggleFullscreen, onShowShortcuts, onShowAbout,
+  onOpenMasterBerkas,
 }: RibbonProps) {
   const [activeTab, setActiveTab] = useState<TabId>('home')
   const [showContent, setShowContent] = useState(true)
@@ -199,6 +201,7 @@ export function Ribbon({
             </RibbonGroup>
             <RibbonGroup label="Settings">
               <RibbonButton icon={<SettingsIcon size={20} />} label="AI Settings" onClick={() => onOpenAISettings?.()} />
+              <RibbonButton icon={<FileIcon size={20} />} label="Master Berkas" onClick={() => onOpenMasterBerkas?.()} />
             </RibbonGroup>
           </>
         )}

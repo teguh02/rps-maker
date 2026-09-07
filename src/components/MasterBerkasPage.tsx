@@ -53,6 +53,7 @@ export function MasterBerkasPage({ onBack }: MasterBerkasPageProps) {
   const [loading, setLoading] = useState(true)
   const [uploading, setUploading] = useState(false)
   const [pendingFile, setPendingFile] = useState<{ file: File; name: string } | null>(null)
+  const [confirmActivate, setConfirmActivate] = useState<string | null>(null) // group id to activate
   const [editingGroupName, setEditingGroupName] = useState<string | null>(null)
   const [groupNameInput, setGroupNameInput] = useState('')
   const [newGroupName, setNewGroupName] = useState('')
@@ -212,49 +213,44 @@ export function MasterBerkasPage({ onBack }: MasterBerkasPageProps) {
 
   if (loading) {
     return (
-      <div className="h-screen flex items-center justify-center bg-gray-50">
-        <div className="text-gray-500">Memuat master berkas...</div>
+      <div className="mk-page">
+        <div className="flex items-center justify-center flex-1">
+          <div className="text-gray-400 text-sm">Memuat master berkas...</div>
+        </div>
       </div>
     )
   }
 
   return (
-    <div className="h-screen flex flex-col bg-gray-50">
+    <div className="mk-page">
       {/* Header */}
-      <div className="bg-white border-b border-gray-200 px-6 py-4 flex items-center gap-4">
-        <button
-          onClick={onBack}
-          className="flex items-center gap-2 text-sm text-gray-600 hover:text-gray-900 transition-colors"
-        >
-          <BackIcon size={18} />
-          Kembali ke Editor
+      <div className="mk-header">
+        <button onClick={onBack} className="mk-back-btn">
+          <BackIcon size={16} />
+          Kembali
         </button>
-        <div className="h-5 w-px bg-gray-300" />
-        <h1 className="text-lg font-bold text-gray-800">📁 Master Berkas</h1>
-        <span className="text-xs text-gray-400 ml-2">Dokumen referensi untuk AI</span>
+        <div style={{ width: 1, height: 20, background: '#e0e0e0' }} />
+        <h1 className="mk-header-title">Master Berkas</h1>
+        <span className="mk-header-sub">Dokumen referensi untuk AI</span>
       </div>
 
-      <div className="flex flex-1 overflow-hidden">
+      <div className="mk-body">
         {/* Sidebar: Groups */}
-        <div className="w-64 bg-white border-r border-gray-200 flex flex-col">
-          <div className="p-3 border-b border-gray-100">
-            <span className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Kelompok</span>
+        <div className="mk-sidebar">
+          <div className="mk-sidebar-header">
+            <span className="mk-sidebar-label">Kelompok</span>
           </div>
-          <div className="flex-1 overflow-y-auto p-2 space-y-1">
+          <div className="mk-sidebar-list">
             {data.groups.map(group => (
               <div
                 key={group.id}
-                className={`group-item px-3 py-2 rounded-lg cursor-pointer text-sm flex items-center gap-2 transition-colors ${
-                  selectedGroupId === group.id
-                    ? 'bg-blue-50 text-blue-700 font-medium'
-                    : 'text-gray-700 hover:bg-gray-100'
-                }`}
+                className={`mk-group-item ${selectedGroupId === group.id ? 'active' : ''}`}
                 onClick={() => setSelectedGroupId(group.id)}
               >
                 {editingGroupName === group.id ? (
                   <input
                     autoFocus
-                    className="flex-1 px-1 py-0.5 text-sm border border-blue-300 rounded"
+                    style={{ flex: 1, padding: '4px 8px', fontSize: 13, border: '1px solid #90caf9', borderRadius: 4 }}
                     value={groupNameInput}
                     onChange={e => setGroupNameInput(e.target.value)}
                     onBlur={() => handleRenameGroup(group.id)}
@@ -266,7 +262,7 @@ export function MasterBerkasPage({ onBack }: MasterBerkasPageProps) {
                   />
                 ) : (
                   <span
-                    className="flex-1 truncate"
+                    style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}
                     onDoubleClick={(e) => {
                       e.stopPropagation()
                       setEditingGroupName(group.id)
@@ -276,26 +272,31 @@ export function MasterBerkasPage({ onBack }: MasterBerkasPageProps) {
                     {group.name}
                   </span>
                 )}
-                <span className="text-xs text-gray-400">{group.documents.length}</span>
+                <span className="mk-group-count">{group.documents.length}</span>
                 {data.activeGroupId === group.id && (
-                  <span className="text-xs text-green-500" title="Aktif untuk AI">✓</span>
+                  <span className="mk-group-check" title="Aktif untuk AI">✓</span>
                 )}
                 <button
-                  className="opacity-0 group-hover:opacity-100 text-gray-400 hover:text-red-500 transition-opacity"
+                  className="mk-doc-card-delete"
+                  style={{ padding: 2 }}
                   onClick={(e) => { e.stopPropagation(); handleDeleteGroup(group.id) }}
                   title="Hapus kelompok"
                 >
-                  <TrashIcon size={14} />
+                  <TrashIcon size={12} />
                 </button>
               </div>
             ))}
+            {data.groups.length === 0 && (
+              <div style={{ padding: '20px 12px', textAlign: 'center', color: '#bdbdbd', fontSize: 12 }}>
+                Belum ada kelompok
+              </div>
+            )}
           </div>
-          <div className="p-2 border-t border-gray-100">
+          <div className="mk-sidebar-footer">
             {showNewGroupInput ? (
-              <div className="flex gap-1">
+              <div className="mk-new-group-input">
                 <input
                   autoFocus
-                  className="flex-1 px-2 py-1.5 text-sm border border-gray-300 rounded"
                   placeholder="Nama kelompok..."
                   value={newGroupName}
                   onChange={e => setNewGroupName(e.target.value)}
@@ -304,18 +305,12 @@ export function MasterBerkasPage({ onBack }: MasterBerkasPageProps) {
                     if (e.key === 'Escape') { setShowNewGroupInput(false); setNewGroupName('') }
                   }}
                 />
-                <button
-                  className="px-2 py-1.5 bg-blue-500 text-white text-sm rounded hover:bg-blue-600"
-                  onClick={handleAddGroup}
-                >
+                <button onClick={handleAddGroup}>
                   <SaveIcon size={14} />
                 </button>
               </div>
             ) : (
-              <button
-                className="w-full flex items-center justify-center gap-2 px-3 py-2 text-sm text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
-                onClick={() => setShowNewGroupInput(true)}
-              >
+              <button className="mk-add-group-btn" onClick={() => setShowNewGroupInput(true)}>
                 <PlusIcon size={16} />
                 Tambah Kelompok
               </button>
@@ -324,69 +319,63 @@ export function MasterBerkasPage({ onBack }: MasterBerkasPageProps) {
         </div>
 
         {/* Main content: Documents */}
-        <div className="flex-1 flex flex-col overflow-hidden">
+        <div className="mk-content">
           {selectedGroup ? (
             <>
               {/* Group header */}
-              <div className="bg-white border-b border-gray-200 px-6 py-4 flex items-center justify-between">
-                <div className="flex items-center gap-3">
-                  <h2 className="text-base font-semibold text-gray-800">{selectedGroup.name}</h2>
-                  <span className="text-xs text-gray-400">
+              <div className="mk-content-header">
+                <div style={{ display: 'flex', alignItems: 'center' }}>
+                  <span className="mk-content-title">{selectedGroup.name}</span>
+                  <span className="mk-content-count">
                     {selectedGroup.documents.length}/{MAX_DOCS_PER_GROUP} dokumen
                   </span>
                 </div>
-                <div className="flex items-center gap-3">
-                  <label className="flex items-center gap-2 text-sm">
-                    <span className="text-gray-600">Gunakan untuk AI:</span>
-                    <button
-                      className={`relative w-10 h-5 rounded-full transition-colors ${
-                        data.activeGroupId === selectedGroup.id ? 'bg-green-500' : 'bg-gray-300'
-                      }`}
-                      onClick={() => handleSetActiveGroup(
-                        data.activeGroupId === selectedGroup.id ? null : selectedGroup.id
-                      )}
-                    >
-                      <span
-                        className={`absolute top-0.5 w-4 h-4 rounded-full bg-white shadow transition-transform ${
-                          data.activeGroupId === selectedGroup.id ? 'translate-x-5' : 'translate-x-0.5'
-                        }`}
-                      />
-                    </button>
-                  </label>
+                <div className="mk-toggle-group">
+                  <span className="mk-toggle-label">Gunakan untuk AI</span>
+                  <button
+                    className={`mk-toggle ${data.activeGroupId === selectedGroup.id ? 'active' : ''}`}
+                    onClick={() => {
+                      if (data.activeGroupId === selectedGroup.id) {
+                        // Deactivate directly
+                        handleSetActiveGroup(null)
+                      } else {
+                        // Show confirmation before activating
+                        setConfirmActivate(selectedGroup.id)
+                      }
+                    }}
+                  >
+                    <span className="mk-toggle-thumb" />
+                  </button>
                 </div>
               </div>
 
               {/* Documents grid */}
-              <div className="flex-1 overflow-y-auto p-6">
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              <div className="mk-docs-grid">
+                <div className="mk-docs-grid-inner">
                   {selectedGroup.documents.map(doc => (
-                    <div key={doc.id} className="bg-white rounded-xl border border-gray-200 p-4 flex flex-col gap-2 hover:shadow-md transition-shadow">
-                      <div className="flex items-start justify-between">
-                        <div className="flex items-center gap-2">
-                          <FileIcon size={20} className="text-blue-500" />
-                          <span className="text-xs font-medium text-blue-600 bg-blue-50 px-1.5 py-0.5 rounded">
-                            {getFileTypeLabel(doc.fileType)}
-                          </span>
+                    <div key={doc.id} className="mk-doc-card">
+                      <div className="mk-doc-card-header">
+                        <div className="mk-doc-card-type">
+                          <FileIcon size={14} />
+                          {getFileTypeLabel(doc.fileType)}
                         </div>
                         <button
-                          className="text-gray-400 hover:text-red-500 transition-colors"
+                          className="mk-doc-card-delete"
                           onClick={() => handleDeleteDocument(doc.id)}
                           title="Hapus dokumen"
                         >
-                          <TrashIcon size={16} />
+                          <TrashIcon size={14} />
                         </button>
                       </div>
-                      <div className="font-medium text-sm text-gray-800 truncate" title={doc.name}>
+                      <div className="mk-doc-card-name" title={doc.name}>
                         {doc.name}
                       </div>
-                      <div className="text-xs text-gray-400 truncate" title={doc.originalName}>
+                      <div className="mk-doc-card-original" title={doc.originalName}>
                         {doc.originalName}
                       </div>
-                      <div className="text-xs text-gray-400">
-                        {doc.extractedText.length.toLocaleString('id-ID')} karakter
-                      </div>
-                      <div className="text-xs text-gray-300 mt-auto">
-                        {new Date(doc.uploadedAt).toLocaleDateString('id-ID')}
+                      <div className="mk-doc-card-meta">
+                        <span>{doc.extractedText.length.toLocaleString('id-ID')} karakter</span>
+                        <span>{new Date(doc.uploadedAt).toLocaleDateString('id-ID')}</span>
                       </div>
                     </div>
                   ))}
@@ -394,12 +383,12 @@ export function MasterBerkasPage({ onBack }: MasterBerkasPageProps) {
                   {/* Upload card */}
                   {selectedGroup.documents.length < MAX_DOCS_PER_GROUP && (
                     <button
-                      className="border-2 border-dashed border-gray-300 rounded-xl p-4 flex flex-col items-center justify-center gap-2 text-gray-400 hover:border-blue-400 hover:text-blue-500 transition-colors min-h-[140px]"
+                      className="mk-upload-card"
                       onClick={() => fileInputRef.current?.click()}
                       disabled={uploading}
                     >
-                      <PlusIcon size={24} />
-                      <span className="text-sm">
+                      <PlusIcon size={28} />
+                      <span className="mk-upload-card-text">
                         {uploading ? 'Mengupload...' : 'Tambah Dokumen'}
                       </span>
                     </button>
@@ -408,10 +397,10 @@ export function MasterBerkasPage({ onBack }: MasterBerkasPageProps) {
               </div>
             </>
           ) : (
-            <div className="flex-1 flex items-center justify-center text-gray-400">
-              <div className="text-center">
-                <FileIcon size={48} className="mx-auto mb-3 opacity-50" />
-                <p className="text-sm">Buat kelompok baru untuk mulai menambahkan dokumen referensi.</p>
+            <div className="mk-empty">
+              <div className="mk-empty-inner">
+                <FileIcon size={48} />
+                <p>Buat kelompok baru untuk mulai<br />menambahkan dokumen referensi.</p>
               </div>
             </div>
           )}
@@ -423,42 +412,38 @@ export function MasterBerkasPage({ onBack }: MasterBerkasPageProps) {
         ref={fileInputRef}
         type="file"
         accept={ACCEPTED_TYPES}
-        className="hidden"
+        style={{ display: 'none' }}
         onChange={handleFileSelect}
       />
 
       {/* Pending file dialog */}
       {pendingFile && (
-        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50">
-          <div className="bg-white rounded-xl shadow-xl w-full max-w-md p-6 space-y-4">
-            <div className="flex items-center justify-between">
-              <h3 className="text-base font-semibold">Upload Dokumen</h3>
-              <button onClick={() => setPendingFile(null)} className="text-gray-400 hover:text-gray-600">
+        <div className="mk-dialog-overlay">
+          <div className="mk-dialog">
+            <div className="mk-dialog-title">
+              <span>Upload Dokumen</span>
+              <button className="mk-dialog-close" onClick={() => setPendingFile(null)}>
                 <XIcon size={18} />
               </button>
             </div>
-            <div className="text-sm text-gray-500">
-              File: <span className="font-medium text-gray-700">{pendingFile.file.name}</span>
+            <div className="mk-dialog-file-info">
+              File: <span>{pendingFile.file.name}</span>
             </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Nama Dokumen</label>
+            <div className="mk-dialog-input-group">
+              <label>Nama Dokumen</label>
               <input
                 autoFocus
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                 value={pendingFile.name}
                 onChange={e => setPendingFile({ ...pendingFile, name: e.target.value })}
                 onKeyDown={e => { if (e.key === 'Enter') handleSaveDocument() }}
               />
             </div>
-            <div className="flex justify-end gap-2">
-              <button
-                className="px-4 py-2 text-sm text-gray-600 hover:bg-gray-100 rounded-lg"
-                onClick={() => setPendingFile(null)}
-              >
+            <div className="mk-dialog-actions">
+              <button className="mk-dialog-cancel" onClick={() => setPendingFile(null)}>
                 Batal
               </button>
               <button
-                className="px-4 py-2 text-sm bg-blue-500 text-white rounded-lg hover:bg-blue-600 disabled:opacity-50"
+                className="mk-dialog-confirm"
                 onClick={handleSaveDocument}
                 disabled={uploading || !pendingFile.name.trim()}
               >
@@ -468,6 +453,43 @@ export function MasterBerkasPage({ onBack }: MasterBerkasPageProps) {
           </div>
         </div>
       )}
+
+      {/* Confirm Activate Dialog */}
+      {confirmActivate && (() => {
+        const group = data.groups.find(g => g.id === confirmActivate)
+        return (
+          <div className="mk-dialog-overlay">
+            <div className="mk-dialog">
+              <div className="mk-dialog-title">
+                <span>Aktifkan Master Berkas</span>
+                <button className="mk-dialog-close" onClick={() => setConfirmActivate(null)}>
+                  <XIcon size={18} />
+                </button>
+              </div>
+              <div style={{ fontSize: 13, color: '#616161', lineHeight: 1.6, marginBottom: 20 }}>
+                <p>Gunakan kelompok <strong>{group?.name}</strong> sebagai konteks AI?</p>
+                <p style={{ marginTop: 8, color: '#9e9e9e', fontSize: 12 }}>
+                  Semua dokumen di kelompok ini ({group?.documents.length || 0} dokumen) akan dikirim ke AI saat generate konten RPS.
+                </p>
+              </div>
+              <div className="mk-dialog-actions">
+                <button className="mk-dialog-cancel" onClick={() => setConfirmActivate(null)}>
+                  Batal
+                </button>
+                <button
+                  className="mk-dialog-confirm"
+                  onClick={() => {
+                    handleSetActiveGroup(confirmActivate)
+                    setConfirmActivate(null)
+                  }}
+                >
+                  Aktifkan
+                </button>
+              </div>
+            </div>
+          </div>
+        )
+      })()}
     </div>
   )
 }

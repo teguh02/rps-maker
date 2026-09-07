@@ -654,7 +654,6 @@ function buildAppMenu() {
 
 /* ── Master Berkas: file-based RAG storage ── */
 const mammoth = require('mammoth');
-const pdfParse = require('pdf-parse');
 const XLSX = require('xlsx');
 const crypto = require('crypto');
 
@@ -679,7 +678,10 @@ function writeMasterBerkas(data) {
 async function extractFileContent(buffer, extension) {
   const ext = extension.toLowerCase();
   if (ext === '.pdf') {
-    const result = await pdfParse(buffer);
+    const { PDFParse } = require('pdf-parse');
+    const parser = new PDFParse({ data: buffer });
+    await parser.load();
+    const result = await parser.getText();
     return result.text || '';
   }
   if (ext === '.docx') {

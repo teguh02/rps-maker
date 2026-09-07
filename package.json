@@ -1,6 +1,6 @@
 {
   "name": "rps-maker",
-  "version": "1.0.1",
+  "version": "1.0.2",
   "description": "Word processor khusus RPS — Rencana Pembelajaran Semester UNISINA",
   "main": "electron/main.js",
   "scripts": {

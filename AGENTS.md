@@ -131,6 +131,20 @@
 - **referensi/ folder**: NOT included in build (excluded via package.json files config)
 - **App icon**: `build/icon.png` (PNG format, not ICO)
 
+### Branch Protection & Release Pipeline (branch `build`)
+- **`build` is protected (ruleset "Protect build branch (PR-only)")** — no direct pushes, force-pushes or deletions; all changes go through PRs. Configured via `gh` CLI (repo settings), ruleset id `22323154`. There is **no bypass actor** (even repo admins must use PRs).
+- **Why the workflow uses an auto-PR**: GitHub deliberately blocks the built-in `github-actions[bot]` from pushing to protected branches (and it cannot be added as a bypass actor). The official pattern is to go through PRs — the workflow creates & merges its own bump PR via the API.
+- **`.github/workflows/build-release.yml`**: when a PR from `main` is merged into `build` (guard: `head.ref == 'main'`, so the bot's own bump PRs never re-trigger a release) it (1) bumps the **patch** version with `npm version patch --no-git-tag-version` on branch `release/vX.Y.Z`, (2) opens a PR to `build` and merges it with `gh pr merge --squash` (`required_approving_review_count: 0`, extra-approval-for-unattributed-changes off), (3) tags `vX.Y.Z` at `origin/build`, (4) builds Windows EXE + macOS DMG (unsigned: `CSC_IDENTITY_AUTO_DISCOVERY=false`), (5) creates the GitHub Release `vX.Y.Z` with those installers. Workflow needs `contents: write` + `pull-requests: write`.
+- Release version, `package.json` version, and the on-screen version chip (via Vite `__APP_VERSION__` define) always match — the app is built *after* the bump lands on `build`.
+- `main` = development branch; releases only happen by merging `main` into `build`.
+- Linux intentionally not built yet.
+
+### In-app Update Mechanism (GitHub Releases)
+- **Source repo**: `teguh02/rps-maker` (public — GitHub API works without a token). Hardcoded in `electron/main.js` (`UPDATE_SOURCE`) next to the semver helpers (`parseVersion`/`isNewer`), 60 s result cache.
+- **Flow**: `StartScreen` calls `checkForUpdates()` on mount (start screen = app open) → main fetches `releases/latest`, compares `tag_name` with `app.getVersion()` → if newer and not dismissed for that version (localStorage `rps-dismissed-update`) it shows an update banner with dismiss (X) + Update buttons + live download %.
+- **Update click** (`updates:install`): picks the platform installer asset (win32 → `.exe`, darwin → `.dmg`), streams it to `app.getPath('temp')` with progress events (`updates:download-progress`), then Windows spawns the NSIS installer detached + quits the app; macOS opens the DMG. In dev (not packaged) it opens the release page in the browser instead.
+- Installers must therefore keep being attached to each GitHub Release — the `.github/workflows/build-release.yml` upload step already does (`*.exe`, `*.dmg`, `*.zip`).
+
 ### AI Integration
 - **Free provider**: OpenRouter with 6 API keys round-robin
 - **Custom provider**: User-provided host/key/model

@@ -1,6 +1,6 @@
 type LogLevel = 'INFO' | 'WARN' | 'ERROR' | 'DEBUG'
 
-type LogModule = 'APP' | 'EDITOR' | 'AI' | 'EXPORT' | 'IPC' | 'FS' | 'RTE' | 'Ribbon'
+type LogModule = 'APP' | 'EDITOR' | 'AI' | 'EXPORT' | 'IPC' | 'FS' | 'RTE' | 'Ribbon' | 'StartScreen'
 
 interface LogEntry {
   timestamp: string

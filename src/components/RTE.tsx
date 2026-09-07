@@ -1,6 +1,5 @@
 import { useEditor, EditorContent } from '@tiptap/react'
 import StarterKit from '@tiptap/starter-kit'
-import { Underline } from '@tiptap/extension-underline'
 import { TextStyle } from '@tiptap/extension-text-style'
 import { FontFamily } from '@tiptap/extension-font-family'
 import { Placeholder } from '@tiptap/extension-placeholder'
@@ -29,7 +28,6 @@ function RTEInner({ content, onUpdate, placeholder, compact }: RTEProps) {
           blockquote: false,
           horizontalRule: false,
         }),
-        Underline,
         TextStyle,
         FontFamily,
         FontSize,
@@ -39,7 +37,6 @@ function RTEInner({ content, onUpdate, placeholder, compact }: RTEProps) {
     }
     return [
       StarterKit,
-      Underline,
       TextStyle,
       FontFamily,
       FontSize,

@@ -22,6 +22,7 @@ interface EditorProps {
   onOpenGuide?: (section: string) => void
   onPreview?: () => void
   onOpenMasterBerkas?: () => void
+  onOpenCustomCommands?: () => void
   autoSaveActive?: boolean
   lastAutoSaveAt?: string | null
   showToast?: (message: string, type?: 'info' | 'warning' | 'error') => void
@@ -54,7 +55,7 @@ interface PertemuanSpecial {
 
 type PertemuanRow = PertemuanItem | PertemuanSpecial
 
-export function Editor({ project, onUpdate, onSave, onExport, onOpenAISettings, onGoHome, onOpenGuide, onPreview, onOpenMasterBerkas, autoSaveActive, lastAutoSaveAt, showToast }: EditorProps) {
+export function Editor({ project, onUpdate, onSave, onExport, onOpenAISettings, onGoHome, onOpenGuide, onPreview, onOpenMasterBerkas, onOpenCustomCommands, autoSaveActive, lastAutoSaveAt, showToast }: EditorProps) {
   const [activeSection, setActiveSection] = useState('identitas')
   const [aiLoading, setAiLoading] = useState(false)
   const [aiError, setAiError] = useState('')
@@ -67,6 +68,8 @@ export function Editor({ project, onUpdate, onSave, onExport, onOpenAISettings, 
   const [showShortcuts, setShowShortcuts] = useState(false)
   const [showAbout, setShowAbout] = useState(false)
   const [isFullscreen, setIsFullscreen] = useState(true) // starts maximized
+  const [showCustomCommandDialog, setShowCustomCommandDialog] = useState(false)
+  const [customCommandText, setCustomCommandText] = useState('')
 
   const handleToggleFullscreen = async () => {
     const result = await (window as any).electronAPI?.toggleFullscreen()
@@ -492,6 +495,17 @@ export function Editor({ project, onUpdate, onSave, onExport, onOpenAISettings, 
     }
   }
 
+  const handleOpenCustomCommand = () => {
+    setCustomCommandText(project.content.custom_command_ai || '')
+    setShowCustomCommandDialog(true)
+  }
+
+  const handleSaveCustomCommand = () => {
+    onUpdate({ custom_command_ai: customCommandText.trim() })
+    setShowCustomCommandDialog(false)
+    safeToast('Custom command tersimpan.', 'info')
+  }
+
   const monthNames: Record<string, string> = {
     '01': 'JANUARI', '02': 'FEBRUARI', '03': 'MARET', '04': 'APRIL',
     '05': 'MEI', '06': 'JUNI', '07': 'JULI', '08': 'AGUSTUS',
@@ -548,6 +562,7 @@ export function Editor({ project, onUpdate, onSave, onExport, onOpenAISettings, 
         onShowShortcuts={() => setShowShortcuts(true)}
         onShowAbout={() => setShowAbout(true)}
         onOpenMasterBerkas={onOpenMasterBerkas}
+        onOpenCustomCommands={handleOpenCustomCommand}
       />
 
       <div className="flex-1 overflow-y-auto bg-[#e8e8e8] flex flex-col items-center">
@@ -1072,6 +1087,49 @@ export function Editor({ project, onUpdate, onSave, onExport, onOpenAISettings, 
       {/* Keyboard shortcuts reference */}
       <ShortcutsDialog open={showShortcuts} onClose={() => setShowShortcuts(false)} />
       <AboutModal open={showAbout} onClose={() => setShowAbout(false)} />
+
+      {/* Custom AI Command Dialog */}
+      {showCustomCommandDialog && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40" onClick={() => setShowCustomCommandDialog(false)}>
+          <div className="bg-white rounded-lg shadow-xl w-[520px] max-h-[80vh] flex flex-col" onClick={(e) => e.stopPropagation()}>
+            <div className="flex items-center justify-between px-5 py-3 border-b border-gray-200">
+              <h3 className="text-sm font-semibold text-gray-800">Custom Commands</h3>
+              <button className="text-gray-400 hover:text-gray-600" onClick={() => setShowCustomCommandDialog(false)}>
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+              </button>
+            </div>
+            <div className="px-5 py-4 flex-1 overflow-y-auto">
+              <p className="text-xs text-gray-500 mb-3">
+                Tulis perintah custom yang akan ditambahkan ke instruksi utama AI saat generate semua section.
+              </p>
+              <textarea
+                className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm text-gray-800 resize-none focus:outline-none focus:border-blue-400 focus:ring-1 focus:ring-blue-400"
+                rows={5}
+                placeholder={'Contoh: Gunakan bahasa formal akademik, sertakan referensi kurikulum 2025, hindari istilah asing tanpa penjelasan...'}
+                value={customCommandText}
+                onChange={(e) => setCustomCommandText(e.target.value)}
+              />
+              <p className="text-[11px] text-gray-400 mt-2">
+                Perintah ini akan disisipkan di akhir system prompt untuk semua section AI.
+              </p>
+            </div>
+            <div className="flex items-center justify-end gap-2 px-5 py-3 border-t border-gray-200">
+              <button
+                className="px-4 py-1.5 text-xs font-medium text-gray-600 border border-gray-300 rounded-md hover:bg-gray-50"
+                onClick={() => setShowCustomCommandDialog(false)}
+              >
+                Batal
+              </button>
+              <button
+                className="px-4 py-1.5 text-xs font-medium text-white bg-blue-600 rounded-md hover:bg-blue-700"
+                onClick={handleSaveCustomCommand}
+              >
+                Simpan
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

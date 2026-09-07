@@ -32,6 +32,7 @@ interface RibbonProps {
   onToggleFullscreen?: () => void
   onShowShortcuts?: () => void
   onShowAbout?: () => void
+  onOpenCustomCommands?: () => void
   activeSection?: string
   onGenerateAI?: () => void
   aiLoading?: boolean
@@ -199,10 +200,11 @@ export function Ribbon({
                 loading={aiLoading}
               />
             </RibbonGroup>
-            <RibbonGroup label="Settings">
-              <RibbonButton icon={<SettingsIcon size={20} />} label="AI Settings" onClick={() => onOpenAISettings?.()} />
-              <RibbonButton icon={<FileIcon size={20} />} label="Master Berkas" onClick={() => onOpenMasterBerkas?.()} />
-            </RibbonGroup>
+      <RibbonGroup label="Settings">
+        <RibbonButton icon={<SettingsIcon size={20} />} label="AI Settings" onClick={() => onOpenAISettings?.()} />
+        <RibbonButton icon={<FileIcon size={20} />} label="Master Berkas" onClick={() => onOpenMasterBerkas?.()} />
+        <RibbonButton icon={<KeyboardIcon size={20} />} label="Custom Commands" onClick={() => onOpenCustomCommands?.()} />
+      </RibbonGroup>
           </>
         )}
 

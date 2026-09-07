@@ -728,6 +728,364 @@ ipcMain.handle('master-berkas:extract', async (_event, { buffer, fileName }) => 
   }
 });
 
+// ── LibreOffice detection, download, and PDF→DOCX conversion ──────────────
+
+const LIBRE_OFFICE_VERSION = '25.2.4';
+const LIBRE_OFFICE_DIR = path.join(app.getPath('temp'), 'libreoffice-portable');
+
+function getLibreOfficePaths() {
+  const platform = process.platform;
+  if (platform === 'win32') {
+    const candidates = [
+      'C:\\Program Files\\LibreOffice\\program\\soffice.exe',
+      'C:\\Program Files (x86)\\LibreOffice\\program\\soffice.exe',
+      path.join(process.env.LOCALAPPDATA || '', 'LibreOffice\\program\\soffice.exe'),
+      path.join(process.env.PROGRAMFILES || '', 'LibreOffice\\program\\soffice.exe'),
+    ];
+    // Also check portable location
+    candidates.push(path.join(LIBRE_OFFICE_DIR, 'program', 'soffice.exe'));
+    return candidates;
+  }
+  if (platform === 'darwin') {
+    return [
+      '/Applications/LibreOffice.app/Contents/MacOS/soffice',
+    ];
+  }
+  // Linux
+  return [
+    '/usr/bin/soffice',
+    '/usr/bin/libreoffice',
+    '/snap/bin/libreoffice',
+    '/usr/local/bin/soffice',
+  ];
+}
+
+async function detectLibreOffice() {
+  const paths = getLibreOfficePaths();
+  for (const p of paths) {
+    if (fs.existsSync(p)) {
+      log.info('LIBRE', 'detected', { path: p });
+      return p;
+    }
+  }
+  // Try PATH
+  return new Promise((resolve) => {
+    const cmd = process.platform === 'win32' ? 'where soffice' : 'which soffice';
+    const child = spawn(cmd, { shell: true, stdio: 'pipe' });
+    let stdout = '';
+    child.stdout.on('data', (d) => { stdout += d.toString(); });
+    child.on('close', (code) => {
+      if (code === 0 && stdout.trim()) {
+        const found = stdout.trim().split('\n')[0].trim();
+        log.info('LIBRE', 'detected_in_path', { path: found });
+        resolve(found);
+      } else {
+        resolve(null);
+      }
+    });
+    child.on('error', () => resolve(null));
+  });
+}
+
+function getLibreOfficeDownloadUrl() {
+  const platform = process.platform;
+  if (platform === 'win32') {
+    return `https://download.documentfoundation.org/libreoffice/stable/${LIBRE_OFFICE_VERSION}/win/x86_64/LibreOffice_${LIBRE_OFFICE_VERSION}_Win_x86-64.msi`;
+  }
+  if (platform === 'darwin') {
+    const arch = process.arch === 'arm64' ? 'aarch64' : 'x86_64';
+    return `https://download.documentfoundation.org/libreoffice/stable/${LIBRE_OFFICE_VERSION}/mac/${arch}/LibreOffice_${LIBRE_OFFICE_VERSION}_MacOS_${arch}.dmg`;
+  }
+  // Linux — DEB for Debian/Ubuntu
+  return `https://download.documentfoundation.org/libreoffice/stable/${LIBRE_OFFICE_VERSION}/linux_x86-64/LibreOffice_${LIBRE_OFFICE_VERSION}_Linux_x86-64_deb.tar.gz`;
+}
+
+function getInstallerPath() {
+  const platform = process.platform;
+  const base = path.join(LIBRE_OFFICE_DIR);
+  if (platform === 'win32') {
+    return path.join(base, 'installer.msi');
+  }
+  if (platform === 'darwin') {
+    return path.join(base, 'installer.dmg');
+  }
+  return path.join(base, 'installer.tar.gz');
+}
+
+function downloadFile(url, destPath, onProgress) {
+  return new Promise((resolve, reject) => {
+    const file = fs.createWriteStream(destPath);
+    const request = (downloadUrl) => {
+      const proto = downloadUrl.startsWith('https') ? https : require('http');
+      proto.get(downloadUrl, { headers: { 'User-Agent': 'RPS-Maker/1.0' } }, (response) => {
+        // Follow redirects
+        if (response.statusCode >= 300 && response.statusCode < 400 && response.headers.location) {
+          request(response.headers.location);
+          return;
+        }
+        if (response.statusCode !== 200) {
+          file.close();
+          fs.unlinkSync(destPath);
+          reject(new Error(`HTTP ${response.statusCode}`));
+          return;
+        }
+        const totalBytes = parseInt(response.headers['content-length'] || '0', 10);
+        let downloaded = 0;
+        response.on('data', (chunk) => {
+          downloaded += chunk.length;
+          if (onProgress && totalBytes > 0) {
+            onProgress({ downloaded, totalBytes, percent: Math.round((downloaded / totalBytes) * 100) });
+          }
+        });
+        response.pipe(file);
+        file.on('finish', () => { file.close(); resolve(); });
+      }).on('error', (err) => {
+        file.close();
+        fs.unlinkSync(destPath);
+        reject(err);
+      });
+    };
+    request(url);
+  });
+}
+
+async function installLibreOfficeWindows(msiPath) {
+  log.info('LIBRE', 'installing_windows', { msiPath });
+  return new Promise((resolve, reject) => {
+    // Silent install to user-local directory to avoid needing admin
+    const installDir = path.join(LIBRE_OFFICE_DIR, 'app');
+    const args = [
+      '/i', msiPath,
+      '/qn',  // quiet, no UI
+      `/INSTALLDIR=${installDir}`,
+      'SELECT_SHORTCUT=0', 'SELECT_DESKTOP_SHORTCUT=0',
+      'ADDLOCAL=ALL',
+    ];
+    const child = spawn('msiexec.exe', args, { stdio: 'pipe' });
+    let stderr = '';
+    child.stderr.on('data', (d) => { stderr += d.toString(); });
+    child.on('close', (code) => {
+      if (code === 0) {
+        const soffice = path.join(installDir, 'program', 'soffice.exe');
+        if (fs.existsSync(soffice)) {
+          log.info('LIBRE', 'installed_windows', { path: soffice });
+          resolve(soffice);
+        } else {
+          reject(new Error('Install selesai tapi soffice.exe tidak ditemukan.'));
+        }
+      } else {
+        reject(new Error(`MSI install gagal (code ${code}): ${stderr}`));
+      }
+    });
+    child.on('error', reject);
+  });
+}
+
+async function installLibreOfficeDarwin(dmgPath) {
+  log.info('LIBRE', 'installing_darwin', { dmgPath });
+  // Mount DMG, copy .app to /Applications
+  return new Promise((resolve, reject) => {
+    const mountPoint = '/Volumes/LibreOffice';
+    spawn('hdiutil', ['attach', dmgPath, '-nobrowse', '-quiet'], { stdio: 'pipe' }).on('close', (code) => {
+      if (code !== 0) return reject(new Error('Gagal mount DMG'));
+      const appSrc = path.join(mountPoint, 'LibreOffice.app');
+      const appDest = '/Applications/LibreOffice.app';
+      spawn('cp', ['-R', appSrc, appDest], { stdio: 'pipe' }).on('close', (code2) => {
+        spawn('hdiutil', ['detach', mountPoint, '-quiet'], { stdio: 'pipe' }).on('close', () => {
+          if (code2 === 0 && fs.existsSync(appDest)) {
+            const soffice = path.join(appDest, 'Contents', 'MacOS', 'soffice');
+            log.info('LIBRE', 'installed_darwin', { path: soffice });
+            resolve(soffice);
+          } else {
+            reject(new Error('Gagal copy LibreOffice.app ke /Applications'));
+          }
+        });
+      });
+    });
+  });
+}
+
+async function installLibreOfficeLinux(tarPath) {
+  log.info('LIBRE', 'installing_linux', { tarPath });
+  const extractDir = path.join(LIBRE_OFFICE_DIR, 'app');
+  fs.mkdirSync(extractDir, { recursive: true });
+  return new Promise((resolve, reject) => {
+    spawn('tar', ['-xzf', tarPath, '-C', extractDir, '--strip-components=1'], { stdio: 'pipe' }).on('close', (code) => {
+      if (code !== 0) return reject(new Error('Gagal ekstrak tar.gz'));
+      const soffice = path.join(extractDir, 'program', 'soffice');
+      if (fs.existsSync(soffice)) {
+        fs.chmodSync(soffice, 0o755);
+        log.info('LIBRE', 'installed_linux', { path: soffice });
+        resolve(soffice);
+      } else {
+        reject(new Error('soffice tidak ditemukan setelah ekstrak'));
+      }
+    });
+  });
+}
+
+async function ensureLibreOffice(mainWindow) {
+  // 1. Detect existing installation
+  const detected = await detectLibreOffice();
+  if (detected) return { sofficePath: detected, installed: false };
+
+  // 2. Not found — download and install
+  log.info('LIBRE', 'not_found_starting_download');
+  if (mainWindow) {
+    mainWindow.webContents.send('libreoffice:status', { status: 'downloading', percent: 0 });
+  }
+
+  const url = getLibreOfficeDownloadUrl();
+  const installerPath = getInstallerPath();
+  fs.mkdirSync(path.dirname(installerPath), { recursive: true });
+
+  try {
+    await downloadFile(url, installerPath, (progress) => {
+      log.debug('LIBRE', 'download_progress', progress);
+      if (mainWindow) {
+        mainWindow.webContents.send('libreoffice:status', { status: 'downloading', ...progress });
+      }
+    });
+  } catch (err) {
+    log.error('LIBRE', 'download_failed', { error: err.message });
+    throw new Error(`Gagal mengunduh LibreOffice: ${err.message}`);
+  }
+
+  if (mainWindow) {
+    mainWindow.webContents.send('libreoffice:status', { status: 'installing' });
+  }
+
+  try {
+    let sofficePath;
+    if (process.platform === 'win32') {
+      sofficePath = await installLibreOfficeWindows(installerPath);
+    } else if (process.platform === 'darwin') {
+      sofficePath = await installLibreOfficeDarwin(installerPath);
+    } else {
+      sofficePath = await installLibreOfficeLinux(installerPath);
+    }
+    // Cleanup installer
+    try { fs.unlinkSync(installerPath); } catch {}
+    if (mainWindow) {
+      mainWindow.webContents.send('libreoffice:status', { status: 'ready' });
+    }
+    return { sofficePath, installed: true };
+  } catch (err) {
+    log.error('LIBRE', 'install_failed', { error: err.message });
+    if (mainWindow) {
+      mainWindow.webContents.send('libreoffice:status', { status: 'error', message: err.message });
+    }
+    throw new Error(`Gagal install LibreOffice: ${err.message}`);
+  }
+}
+
+async function convertPdfToDocx(sofficePath, pdfPath, docxPath) {
+  log.info('LIBRE', 'converting_pdf_to_docx', { sofficePath, pdfPath, docxPath });
+  const outDir = path.dirname(docxPath);
+  return new Promise((resolve, reject) => {
+    const args = [
+      '--headless',
+      '--norestore',
+      '--infilter="writer_pdf_import"',
+      '--convert-to', 'docx',
+      '--outdir', outDir,
+      pdfPath,
+    ];
+    const child = spawn(sofficePath, args, { stdio: 'pipe', env: { ...process.env, HOME: LIBRE_OFFICE_DIR } });
+    let stdout = '';
+    let stderr = '';
+    child.stdout.on('data', (d) => { stdout += d.toString(); });
+    child.stderr.on('data', (d) => { stderr += d.toString(); });
+    child.on('close', (code) => {
+      log.info('LIBRE', 'convert_exit', { code, stdout: stdout.slice(0, 500), stderr: stderr.slice(0, 500) });
+      // LibreOffice generates output filename from input name
+      const baseName = path.basename(pdfPath, '.pdf');
+      const expectedOutput = path.join(outDir, baseName + '.docx');
+      if (fs.existsSync(expectedOutput)) {
+        // Rename to desired path if different
+        if (expectedOutput !== docxPath) {
+          fs.copyFileSync(expectedOutput, docxPath);
+          try { fs.unlinkSync(expectedOutput); } catch {}
+        }
+        resolve(docxPath);
+      } else {
+        reject(new Error(`Konversi gagal. Output tidak ditemukan.`));
+      }
+    });
+    child.on('error', reject);
+  });
+}
+
+// IPC: Check LibreOffice status
+ipcMain.handle('libreoffice:check', async () => {
+  const detected = await detectLibreOffice();
+  return { available: !!detected, path: detected };
+});
+
+// IPC: Export DOCX via LibreOffice (PDF → DOCX)
+ipcMain.handle('docx:export-via-libreoffice', async (event, { html, filePath }) => {
+  const startTime = Date.now();
+  log.info('IPC', 'docx:export-via-libreoffice');
+
+  const win = BrowserWindow.fromWebContents(event.sender);
+
+  // 1. Ensure LibreOffice is available (auto-download if needed)
+  let sofficePath;
+  try {
+    const result = await ensureLibreOffice(win);
+    sofficePath = result.sofficePath;
+    if (result.installed) {
+      log.info('IPC', 'libreoffice_auto_installed', { path: sofficePath });
+    }
+  } catch (err) {
+    log.error('IPC', 'libreoffice_unavailable', { error: err.message });
+    return { ok: false, error: err.message, fallback: true };
+  }
+
+  // 2. Generate temporary PDF from HTML
+  const tmpPdf = path.join(app.getPath('temp'), `rps-export-${Date.now()}.pdf`);
+  const tmpHtml = path.join(app.getPath('temp'), `rps-export-${Date.now()}.html`);
+  let tmpWin;
+  try {
+    fs.writeFileSync(tmpHtml, html, 'utf-8');
+    tmpWin = new BrowserWindow({
+      width: 1200, height: 900, show: false,
+      webPreferences: { webSecurity: false },
+    });
+    const fileUrl = 'file://' + tmpHtml.replace(/\\/g, '/');
+    await new Promise((resolve, reject) => {
+      const timer = setTimeout(() => reject(new Error('PDF load timeout')), 30000);
+      tmpWin.webContents.once('did-finish-load', () => { clearTimeout(timer); resolve(); });
+      tmpWin.webContents.once('did-fail-load', (_e, code, desc) => { clearTimeout(timer); reject(new Error(`fail ${code}: ${desc}`)); });
+      tmpWin.loadURL(fileUrl);
+    });
+    await new Promise(r => setTimeout(r, 1000));
+    const pdfBuffer = await tmpWin.webContents.printToPDF({ landscape: true, preferCSSPageSize: true });
+    fs.writeFileSync(tmpPdf, pdfBuffer);
+    log.info('IPC', 'tmp_pdf_created', { bytes: pdfBuffer.byteLength });
+  } catch (err) {
+    log.error('IPC', 'tmp_pdf_failed', { error: err.message });
+    return { ok: false, error: `Gagal generate PDF: ${err.message}`, fallback: true };
+  } finally {
+    if (tmpWin) tmpWin.destroy();
+    try { fs.unlinkSync(tmpHtml); } catch {}
+  }
+
+  // 3. Convert PDF → DOCX via LibreOffice
+  try {
+    await convertPdfToDocx(sofficePath, tmpPdf, filePath);
+    const duration = ((Date.now() - startTime) / 1000).toFixed(1);
+    const size = fs.statSync(filePath).size;
+    log.info('IPC', 'docx_export_complete', { filePath, duration, bytes: size });
+    return { ok: true };
+  } catch (err) {
+    log.error('IPC', 'docx_convert_failed', { error: err.message });
+    return { ok: false, error: err.message, fallback: true };
+  } finally {
+    try { fs.unlinkSync(tmpPdf); } catch {}
+  }
+});
+
 app.whenReady().then(() => {
   createWindow();
 

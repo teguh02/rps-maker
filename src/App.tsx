@@ -80,6 +80,8 @@ const defaultContent: Record<string, string> = {
   matakuliah_syarat: '',
   // Tabel Pertemuan
   pertemuan: '[]',
+  // Custom AI command
+  custom_command_ai: '',
 }
 
 function App() {

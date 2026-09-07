@@ -1,7 +1,7 @@
 import { useState, useSyncExternalStore } from 'react'
 import {
   HomeIcon, FileIcon, FolderOpenIcon, SaveIcon,
-  ExportWordIcon, ExportPdfIcon, SparklesIcon, SettingsIcon,
+  ExportWordIcon, ExportPdfIcon, ExportTxtIcon, SparklesIcon, SettingsIcon,
   CopyIcon, CutIcon, PasteIcon, KeyboardIcon, InfoIcon,
   UndoIcon, RedoIcon, ZoomInIcon, ZoomOutIcon, ZoomResetIcon, FullscreenIcon, ExitFullscreenIcon,
   BoldIcon, ItalicIcon, UnderlineIcon, StrikeIcon,
@@ -14,7 +14,7 @@ import { logger } from '../utils/logger'
 
 interface RibbonProps {
   onSave: () => void
-  onExport?: (format: 'pdf' | 'docx') => void
+  onExport?: (format: 'pdf' | 'docx' | 'txt') => void
   onOpenAISettings?: () => void
   onGoHome?: () => void
   onCut?: () => void
@@ -136,6 +136,7 @@ export function Ribbon({
             <RibbonGroup label="Export">
               <RibbonButton icon={<ExportWordIcon size={20} />} label="Word" onClick={() => onExport?.('docx')} />
               <RibbonButton icon={<ExportPdfIcon size={20} />} label="PDF" onClick={() => onExport?.('pdf')} />
+              <RibbonButton icon={<ExportTxtIcon size={20} />} label="TXT" onClick={() => onExport?.('txt')} />
             </RibbonGroup>
           </>
         )}

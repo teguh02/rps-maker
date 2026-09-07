@@ -688,8 +688,12 @@ async function extractFileContent(buffer, extension) {
     const result = await mammoth.extractRawText({ buffer });
     return result.value || '';
   }
-  if (ext === '.xlsx' || ext === '.csv') {
+  if (ext === '.csv') {
+    return buffer.toString('utf-8').replace(/^\uFEFF/, '');
+  }
+  if (ext === '.xlsx') {
     const workbook = XLSX.read(buffer, { type: 'buffer' });
+    if (!workbook.SheetNames.length) return '';
     const allText = workbook.SheetNames.map(name => {
       const csv = XLSX.utils.sheet_to_csv(workbook.Sheets[name]);
       return `--- Sheet: ${name} ---\n${csv}`;

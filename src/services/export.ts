@@ -746,14 +746,35 @@ export async function exportDocx(data: ExportData, filePath: string): Promise<vo
   const startTime = Date.now()
   const c = data.content
   logger.info('EXPORT', 'export.docx_start')
+
+  // Try LibreOffice approach first: generate PDF → convert to DOCX
+  try {
+    await initLogo()
+    const html = buildRpsHtml(data.content)
+    const result = await window.electronAPI.exportDocxViaLibreOffice({ html, filePath })
+    if (result.ok) {
+      const duration = ((Date.now() - startTime) / 1000).toFixed(1)
+      logger.info('EXPORT', 'export.docx_libreoffice_complete', { filePath, duration })
+      return
+    }
+    if (!result.fallback) {
+      throw new Error(result.error || 'LibreOffice conversion failed')
+    }
+    // Fallback to docx library
+    logger.info('EXPORT', 'export.docx_fallback_to_docx_library', { reason: result.error })
+  } catch (err) {
+    logger.info('EXPORT', 'export.docx_libreoffice_error', { error: (err as Error).message })
+  }
+
+  // Fallback: use docx library (original approach)
+  logger.info('EXPORT', 'export.docx_fallback_start')
   const logoData = await fetchLogo()
   const doc = buildDocx(c, logoData)
   const blob = await Packer.toBlob(doc)
   const buffer = await blob.arrayBuffer()
   await window.electronAPI.writeFileToPath(filePath, new Uint8Array(buffer))
-  logger.info('EXPORT', 'export.docx_complete', { size: buffer.byteLength })
   const duration = ((Date.now() - startTime) / 1000).toFixed(1)
-  logger.info('EXPORT', 'export.docx_complete', { filePath, duration, bytes: buffer.byteLength })
+  logger.info('EXPORT', 'export.docx_fallback_complete', { filePath, duration, bytes: buffer.byteLength })
 }
 
 /**

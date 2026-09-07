@@ -48,6 +48,10 @@ declare global {
     masterBerkasSave: (data: any) => Promise<void>
     masterBerkasExtract: (data: { buffer: number[]; fileName: string }) => Promise<{ ok: boolean; extractedText?: string; error?: string }>
 
+    libreOfficeCheck: () => Promise<{ available: boolean; path: string | null }>
+    exportDocxViaLibreOffice: (options: { html: string; filePath: string }) => Promise<{ ok: boolean; error?: string; fallback?: boolean }>
+    onLibreOfficeStatus: (callback: (data: { status: string; percent?: number; downloaded?: number; totalBytes?: number; message?: string }) => void) => () => void
+
     platform: string
   }
 

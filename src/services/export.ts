@@ -26,7 +26,7 @@ import {
   ImageRun,
 } from 'docx'
 import { logger } from '../utils/logger'
-import { buildRpsHtml, fullDate, initLogo } from './rpsDocument'
+import { buildRpsHtml, buildRpsTxt, fullDate, initLogo } from './rpsDocument'
 import logoUrl from '../assets/logo-unisina.png?url'
 
 export interface ExportData {
@@ -744,37 +744,19 @@ async function fetchLogo(): Promise<string | null> {
 
 export async function exportDocx(data: ExportData, filePath: string): Promise<void> {
   const startTime = Date.now()
-  const c = data.content
   logger.info('EXPORT', 'export.docx_start')
 
-  // Try LibreOffice approach first: generate PDF → convert to DOCX
-  try {
-    await initLogo()
-    const html = buildRpsHtml(data.content)
-    const result = await window.electronAPI.exportDocxViaLibreOffice({ html, filePath })
-    if (result.ok) {
-      const duration = ((Date.now() - startTime) / 1000).toFixed(1)
-      logger.info('EXPORT', 'export.docx_libreoffice_complete', { filePath, duration })
-      return
-    }
-    if (!result.fallback) {
-      throw new Error(result.error || 'LibreOffice conversion failed')
-    }
-    // Fallback to docx library
-    logger.info('EXPORT', 'export.docx_fallback_to_docx_library', { reason: result.error })
-  } catch (err) {
-    logger.info('EXPORT', 'export.docx_libreoffice_error', { error: (err as Error).message })
+  // LibreOffice approach: generate PDF → convert to DOCX
+  await initLogo()
+  const html = buildRpsHtml(data.content)
+  const result = await window.electronAPI.exportDocxViaLibreOffice({ html, filePath })
+  if (result.ok) {
+    const duration = ((Date.now() - startTime) / 1000).toFixed(1)
+    logger.info('EXPORT', 'export.docx_libreoffice_complete', { filePath, duration })
+    return
   }
-
-  // Fallback: use docx library (original approach)
-  logger.info('EXPORT', 'export.docx_fallback_start')
-  const logoData = await fetchLogo()
-  const doc = buildDocx(c, logoData)
-  const blob = await Packer.toBlob(doc)
-  const buffer = await blob.arrayBuffer()
-  await window.electronAPI.writeFileToPath(filePath, new Uint8Array(buffer))
-  const duration = ((Date.now() - startTime) / 1000).toFixed(1)
-  logger.info('EXPORT', 'export.docx_fallback_complete', { filePath, duration, bytes: buffer.byteLength })
+  // LibreOffice required — no fallback
+  throw new Error(result.error || 'Export Word membutuhkan LibreOffice. Silakan install LibreOffice terlebih dahulu.')
 }
 
 /**
@@ -792,4 +774,15 @@ export async function exportPdf(data: ExportData, filePath: string): Promise<voi
   }
   const duration = ((Date.now() - startTime) / 1000).toFixed(1)
   logger.info('EXPORT', 'export.pdf_complete', { filePath, duration })
+}
+
+/** TXT export — plain text, human-readable + AI-parseable */
+export async function exportTxt(data: ExportData, filePath: string): Promise<void> {
+  const startTime = Date.now()
+  logger.info('EXPORT', 'export.txt_start')
+  const txt = buildRpsTxt(data.content)
+  const bytes = new TextEncoder().encode(txt)
+  await window.electronAPI.writeFileToPath(filePath, bytes)
+  const duration = ((Date.now() - startTime) / 1000).toFixed(1)
+  logger.info('EXPORT', 'export.txt_complete', { filePath, duration, bytes: bytes.byteLength })
 }

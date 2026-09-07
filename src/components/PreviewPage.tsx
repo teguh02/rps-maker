@@ -1,15 +1,16 @@
 import { useMemo, useState, useEffect, useRef, useCallback } from 'react'
 import { buildRpsHtml } from '../services/rpsDocument'
-import { BackIcon, PreviewIcon, ExportWordIcon, ExportPdfIcon } from './icons'
+import { BackIcon, PreviewIcon, ExportWordIcon, ExportPdfIcon, ExportTxtIcon } from './icons'
 
 interface PreviewPageProps {
   content: Record<string, string>
   onBack: () => void
   onExportWord: () => void
   onExportPdf: () => void
+  onExportTxt: () => void
 }
 
-export function PreviewPage({ content, onBack, onExportWord, onExportPdf }: PreviewPageProps) {
+export function PreviewPage({ content, onBack, onExportWord, onExportPdf, onExportTxt }: PreviewPageProps) {
   const html = useMemo(() => buildRpsHtml(content), [content])
   const mk = content.mata_kuliah || 'RPS'
 
@@ -37,12 +38,13 @@ export function PreviewPage({ content, onBack, onExportWord, onExportPdf }: Prev
 
   const fit = useCallback(() => setZoom(1), [])
 
-  const runExport = async (kind: 'word' | 'pdf') => {
+  const runExport = async (kind: 'word' | 'pdf' | 'txt') => {
     if (busy) return
     setBusy(kind)
     try {
       if (kind === 'word') await onExportWord()
-      else await onExportPdf()
+      else if (kind === 'pdf') await onExportPdf()
+      else await onExportTxt()
     } finally {
       setBusy(null)
     }
@@ -67,6 +69,10 @@ export function PreviewPage({ content, onBack, onExportWord, onExportPdf }: Prev
           <button className="pv-btn pv-btn-primary" onClick={() => void runExport('pdf')} disabled={busy !== null}>
             <ExportPdfIcon size={16} />
             {busy === 'pdf' ? 'Membuat PDF…' : 'Ekspor PDF'}
+          </button>
+          <button className="pv-btn" onClick={() => void runExport('txt')} disabled={busy !== null}>
+            <ExportTxtIcon size={16} />
+            {busy === 'txt' ? 'Menyiapkan…' : 'Ekspor TXT'}
           </button>
           <span className="pv-sep" />
           <button className="pv-btn pv-btn-icon" onClick={() => step(-1)} title="Perkecil">−</button>

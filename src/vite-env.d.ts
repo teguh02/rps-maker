@@ -49,7 +49,8 @@ declare global {
     masterBerkasExtract: (data: { buffer: number[]; fileName: string }) => Promise<{ ok: boolean; extractedText?: string; error?: string }>
 
     libreOfficeCheck: () => Promise<{ available: boolean; path: string | null }>
-    exportDocxViaLibreOffice: (options: { html: string; filePath: string }) => Promise<{ ok: boolean; error?: string; fallback?: boolean }>
+    libreOfficeEnsure: () => Promise<{ ok: boolean; path?: string; installed?: boolean; error?: string }>
+    exportDocxViaLibreOffice: (options: { html: string; filePath: string }) => Promise<{ ok: boolean; error?: string }>
     onLibreOfficeStatus: (callback: (data: { status: string; percent?: number; downloaded?: number; totalBytes?: number; message?: string }) => void) => () => void
 
     platform: string

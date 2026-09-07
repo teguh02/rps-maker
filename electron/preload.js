@@ -33,6 +33,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
   onUpdateProgress: (callback) => { const listener = (_e, data) => callback(data); ipcRenderer.on('updates:download-progress', listener); return () => ipcRenderer.removeListener('updates:download-progress', listener); },
 
   libreOfficeCheck: () => ipcRenderer.invoke('libreoffice:check'),
+  libreOfficeEnsure: () => ipcRenderer.invoke('libreoffice:ensure'),
   exportDocxViaLibreOffice: (options) => ipcRenderer.invoke('docx:export-via-libreoffice', options),
   onLibreOfficeStatus: (callback) => { const listener = (_e, data) => callback(data); ipcRenderer.on('libreoffice:status', listener); return () => ipcRenderer.removeListener('libreoffice:status', listener); },
 

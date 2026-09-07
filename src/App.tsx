@@ -7,7 +7,7 @@ import { ImportDialog } from './components/ImportDialog'
 import { GuidePage, guideSections } from './components/GuidePage'
 import { PreviewPage } from './components/PreviewPage'
 import { MasterBerkasPage } from './components/MasterBerkasPage'
-import { exportDocx, exportPdf } from './services/export'
+import { exportDocx, exportPdf, exportTxt } from './services/export'
 import { logger } from './utils/logger'
 
 export interface Project {
@@ -93,6 +93,9 @@ function App() {
   const [activeGuide, setActiveGuide] = useState<string | null>(null)
   const [showPreview, setShowPreview] = useState(false)
   const [showMasterBerkas, setShowMasterBerkas] = useState(false)
+  const [showDocxConfirm, setShowDocxConfirm] = useState(false)
+  const [docxConfirmMessage, setDocxConfirmMessage] = useState<string>('')
+  const [docxExportFn, setDocxExportFn] = useState<(() => Promise<void>) | null>(null)
   const [autoSaveActive, setAutoSaveActive] = useState(false)
   const [lastAutoSaveAt, setLastAutoSaveAt] = useState<string | null>(null)
   const [toast, setToast] = useState<{ message: string; type: 'info' | 'warning' | 'error' } | null>(null)
@@ -215,25 +218,70 @@ function App() {
     return ok
   }, [])
 
-  const handleExport = async (format: 'pdf' | 'docx' = 'pdf') => {
+  const handleExport = async (format: 'pdf' | 'docx' | 'txt' = 'pdf') => {
     if (!project) return
     logger.info('APP', 'project.export', { format })
-    const ext = format === 'pdf' ? 'pdf' : 'docx'
+
+    const ext = format === 'pdf' ? 'pdf' : format === 'docx' ? 'docx' : 'txt'
     const mk = project.content.mata_kuliah || ''
     const sem = project.content.semester || ''
     const ta = project.content.semester_akademik || ''
     const parts = [mk, sem, ta].filter(Boolean).join('_').replace(/\s+/g, '_')
     const name = parts ? `RPS_${parts}.${ext}` : `export.${ext}`
+
+    if (format === 'docx') {
+      const libre = await window.electronAPI.libreOfficeCheck()
+      if (!libre.available) {
+        setDocxExportFn(() => async () => {
+          const libre = await window.electronAPI.libreOfficeEnsure()
+          if (!libre.ok) {
+            showToast('Gagal: ' + (libre.error || 'LibreOffice tidak tersedia'), 'error')
+            return
+          }
+          if (libre.installed) {
+            showToast('LibreOffice berhasil diinstall!', 'info')
+          }
+          const result = await window.electronAPI.exportFile({ format: 'docx', defaultName: name })
+          if (result) {
+            try {
+              await exportDocx({ content: project.content }, result.filePath)
+              logger.info('APP', 'project.export_complete', { format: 'docx', filePath: result.filePath })
+              showToast('Berhasil diekspor ke DOCX.', 'info')
+            } catch (err) {
+              logger.error('APP', 'project.export_error', { format: 'docx', error: (err as Error).message })
+              showToast('Gagal export: ' + (err as Error).message, 'error')
+            }
+          }
+        })
+        setDocxConfirmMessage('Export Word membutuhkan LibreOffice. Aplikasi akan mengunduh dan menginstallnya secara otomatis (~300 MB).')
+        setShowDocxConfirm(true)
+        return
+      }
+      const result = await window.electronAPI.exportFile({ format: 'docx', defaultName: name })
+      if (result) {
+        try {
+          await exportDocx({ content: project.content }, result.filePath)
+          logger.info('APP', 'project.export_complete', { format: 'docx', filePath: result.filePath })
+          showToast('Berhasil diekspor ke DOCX.', 'info')
+        } catch (err) {
+          logger.error('APP', 'project.export_error', { format: 'docx', error: (err as Error).message })
+          showToast('Gagal export: ' + (err as Error).message, 'error')
+        }
+      }
+      return
+    }
+
     const result = await window.electronAPI.exportFile({ format, defaultName: name })
     if (result) {
       try {
-        if (format === 'docx') {
-          await exportDocx({ content: project.content }, result.filePath)
+        if (format === 'txt') {
+          await exportTxt({ content: project.content }, result.filePath)
+          showToast('Berhasil diekspor ke TXT.', 'info')
         } else {
           await exportPdf({ content: project.content }, result.filePath)
+          showToast('Berhasil diekspor ke PDF.', 'info')
         }
         logger.info('APP', 'project.export_complete', { format, filePath: result.filePath })
-        showToast(`Berhasil diekspor ke ${format.toUpperCase()}.`, 'info')
       } catch (err) {
         logger.error('APP', 'project.export_error', { format, error: (err as Error).message })
         showToast('Gagal export: ' + (err as Error).message, 'error')
@@ -268,9 +316,26 @@ function App() {
   const handlersRef = useRef({ handleNewProject, handleSaveProject, handleSaveAs, handleOpenProject, handleExport })
   handlersRef.current = { handleNewProject, handleSaveProject, handleSaveAs, handleOpenProject, handleExport }
 
+  // LibreOffice download/install status listener
+  useEffect(() => {
+    const unsub = window.electronAPI.onLibreOfficeStatus((data) => {
+      if (data.status === 'downloading') {
+        const pct = data.percent ?? 0
+        showToast(`Mengunduh LibreOffice... ${pct}%`, 'info')
+      } else if (data.status === 'installing') {
+        showToast('Menginstall LibreOffice...', 'info')
+      } else if (data.status === 'ready') {
+        showToast('LibreOffice berhasil diinstall!', 'info')
+      } else if (data.status === 'error') {
+        showToast('Gagal install LibreOffice: ' + (data.message || 'Unknown error'), 'error')
+      }
+    })
+    return unsub
+  }, [])
+
   // Keep latest dialog state so the Esc key handler (registered once) never goes stale.
-  const uiRef = useRef({ showImport, showAISettings, activeGuide, showPreview, showMasterBerkas })
-  uiRef.current = { showImport, showAISettings, activeGuide, showPreview, showMasterBerkas }
+  const uiRef = useRef({ showImport, showAISettings, activeGuide, showPreview, showMasterBerkas, showDocxConfirm })
+  uiRef.current = { showImport, showAISettings, activeGuide, showPreview, showMasterBerkas, showDocxConfirm }
 
   useEffect(() => {
     loadRecentFiles()
@@ -288,7 +353,8 @@ function App() {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key !== 'Escape') return
       const ui = uiRef.current
-      if (ui.showMasterBerkas) setShowMasterBerkas(false)
+      if (ui.showDocxConfirm) setShowDocxConfirm(false)
+      else if (ui.showMasterBerkas) setShowMasterBerkas(false)
       else if (ui.showPreview) setShowPreview(false)
       else if (ui.activeGuide) setActiveGuide(null)
       else if (ui.showImport) setShowImport(false)
@@ -409,6 +475,27 @@ function App() {
         setShowStart(false)
         showToast('Data kurikulum berhasil diimpor.', 'info')
       }} />
+
+      {/* LibreOffice Export Confirmation Dialog */}
+      {showDocxConfirm && (
+        <div className="mk-dialog-overlay" onClick={() => setShowDocxConfirm(false)}>
+          <div className="mk-dialog" onClick={(e) => e.stopPropagation()}>
+            <div className="mk-dialog-title">
+              <span>Export ke Word (DOCX)</span>
+            </div>
+            <p style={{ fontSize: 13, color: '#616161', marginBottom: 8, lineHeight: 1.5 }}>
+              {docxConfirmMessage}
+            </p>
+            <div className="mk-dialog-actions">
+              <button className="mk-dialog-cancel" onClick={() => setShowDocxConfirm(false)}>Batal</button>
+              <button className="mk-dialog-confirm" onClick={() => {
+                setShowDocxConfirm(false)
+                docxExportFn?.()
+              }}>Export</button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Toast notification */}
       {toast && (

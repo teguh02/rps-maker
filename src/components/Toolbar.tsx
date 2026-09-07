@@ -3,7 +3,7 @@ import { useState } from 'react'
 interface ToolbarProps {
   onSave: () => void
   onSaveAs: () => void
-  onExport?: (format: 'pdf' | 'docx') => void
+  onExport?: (format: 'pdf' | 'docx' | 'txt') => void
   onOpenAISettings?: () => void
 }
 

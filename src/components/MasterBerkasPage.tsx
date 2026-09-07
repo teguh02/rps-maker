@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react'
-import { BackIcon, PlusIcon, TrashIcon, SaveIcon, FileIcon, XIcon } from './icons'
+import { BackIcon, PlusIcon, TrashIcon, SaveIcon, FileIcon, XIcon, PreviewIcon } from './icons'
 
 interface MasterBerkasDocument {
   id: string
@@ -58,6 +58,9 @@ export function MasterBerkasPage({ onBack }: MasterBerkasPageProps) {
   const [groupNameInput, setGroupNameInput] = useState('')
   const [newGroupName, setNewGroupName] = useState('')
   const [showNewGroupInput, setShowNewGroupInput] = useState(false)
+  const [viewingDoc, setViewingDoc] = useState<MasterBerkasDocument | null>(null)
+  const [confirmDeleteGroup, setConfirmDeleteGroup] = useState<string | null>(null)
+  const [confirmDeleteDoc, setConfirmDeleteDoc] = useState<string | null>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
 
   useEffect(() => {
@@ -130,7 +133,6 @@ export function MasterBerkasPage({ onBack }: MasterBerkasPageProps) {
   }
 
   const handleDeleteGroup = async (groupId: string) => {
-    if (!confirm('Hapus kelompok ini beserta semua dokumennya?')) return
     const newData = {
       ...data,
       groups: data.groups.filter(g => g.id !== groupId),
@@ -140,6 +142,7 @@ export function MasterBerkasPage({ onBack }: MasterBerkasPageProps) {
     if (selectedGroupId === groupId) {
       setSelectedGroupId(newData.groups[0]?.id || null)
     }
+    setConfirmDeleteGroup(null)
   }
 
   const handleSetActiveGroup = async (groupId: string | null) => {
@@ -199,7 +202,6 @@ export function MasterBerkasPage({ onBack }: MasterBerkasPageProps) {
 
   const handleDeleteDocument = async (docId: string) => {
     if (!selectedGroupId) return
-    if (!confirm('Hapus dokumen ini?')) return
     const newData = {
       ...data,
       groups: data.groups.map(g =>
@@ -209,10 +211,10 @@ export function MasterBerkasPage({ onBack }: MasterBerkasPageProps) {
       ),
     }
     await saveData(newData)
+    setConfirmDeleteDoc(null)
   }
 
-  if (loading) {
-    return (
+  if (loading) {    return (
       <div className="mk-page">
         <div className="flex items-center justify-center flex-1">
           <div className="text-gray-400 text-sm">Memuat master berkas...</div>
@@ -360,8 +362,15 @@ export function MasterBerkasPage({ onBack }: MasterBerkasPageProps) {
                           {getFileTypeLabel(doc.fileType)}
                         </div>
                         <button
+                          className="mk-doc-card-view"
+                          onClick={() => setViewingDoc(doc)}
+                          title="Lihat konten ekstraksi"
+                        >
+                          <PreviewIcon size={14} />
+                        </button>
+                        <button
                           className="mk-doc-card-delete"
-                          onClick={() => handleDeleteDocument(doc.id)}
+                          onClick={() => setConfirmDeleteDoc(doc.id)}
                           title="Hapus dokumen"
                         >
                           <TrashIcon size={14} />
@@ -490,6 +499,102 @@ export function MasterBerkasPage({ onBack }: MasterBerkasPageProps) {
           </div>
         )
       })()}
+
+      {/* Confirm Delete Group Dialog */}
+      {confirmDeleteGroup && (() => {
+        const group = data.groups.find(g => g.id === confirmDeleteGroup)
+        const isActive = data.activeGroupId === confirmDeleteGroup
+        return (
+          <div className="mk-dialog-overlay">
+            <div className="mk-dialog">
+              <div className="mk-dialog-title">
+                <span>Hapus Kelompok</span>
+                <button className="mk-dialog-close" onClick={() => setConfirmDeleteGroup(null)}>
+                  <XIcon size={18} />
+                </button>
+              </div>
+              <div style={{ fontSize: 13, color: '#616161', lineHeight: 1.6, marginBottom: 20 }}>
+                <p>Hapus kelompok <strong>{group?.name}</strong>?</p>
+                {isActive && (
+                  <p style={{ marginTop: 8, color: '#f44336', fontSize: 12 }}>
+                    Kelompok ini sedang aktif untuk AI. Menghapusnya akan menonaktifkan konteks AI.
+                  </p>
+                )}
+                <p style={{ marginTop: 8, color: '#9e9e9e', fontSize: 12 }}>
+                  Semua dokumen di kelompok ini ({group?.documents.length || 0} dokumen) akan dihapus permanen.
+                </p>
+              </div>
+              <div className="mk-dialog-actions">
+                <button className="mk-dialog-cancel" onClick={() => setConfirmDeleteGroup(null)}>
+                  Batal
+                </button>
+                <button
+                  className="mk-dialog-confirm mk-dialog-danger"
+                  onClick={() => handleDeleteGroup(confirmDeleteGroup)}
+                >
+                  Hapus
+                </button>
+              </div>
+            </div>
+          </div>
+        )
+      })()}
+
+      {/* Confirm Delete Document Dialog */}
+      {confirmDeleteDoc && (() => {
+        const doc = selectedGroup?.documents.find(d => d.id === confirmDeleteDoc)
+        return (
+          <div className="mk-dialog-overlay">
+            <div className="mk-dialog">
+              <div className="mk-dialog-title">
+                <span>Hapus Dokumen</span>
+                <button className="mk-dialog-close" onClick={() => setConfirmDeleteDoc(null)}>
+                  <XIcon size={18} />
+                </button>
+              </div>
+              <div style={{ fontSize: 13, color: '#616161', lineHeight: 1.6, marginBottom: 20 }}>
+                <p>Hapus dokumen <strong>{doc?.name}</strong>?</p>
+                <p style={{ marginTop: 8, color: '#9e9e9e', fontSize: 12 }}>
+                  Data ekstraksi akan dihapus permanen dari kelompok ini.
+                </p>
+              </div>
+              <div className="mk-dialog-actions">
+                <button className="mk-dialog-cancel" onClick={() => setConfirmDeleteDoc(null)}>
+                  Batal
+                </button>
+                <button
+                  className="mk-dialog-confirm mk-dialog-danger"
+                  onClick={() => handleDeleteDocument(confirmDeleteDoc)}
+                >
+                  Hapus
+                </button>
+              </div>
+            </div>
+          </div>
+        )
+      })()}
+
+      {/* Document Content Viewer */}
+      {viewingDoc && (
+        <div className="mk-doc-view">
+          <div className="mk-doc-view-header">
+            <button className="mk-doc-view-back" onClick={() => setViewingDoc(null)}>
+              <BackIcon size={18} />
+              <span>Kembali</span>
+            </button>
+            <div className="mk-doc-view-title">
+              <FileIcon size={16} />
+              <span>{viewingDoc.name}</span>
+            </div>
+            <div className="mk-doc-view-meta">
+              {getFileTypeLabel(viewingDoc.fileType)} &bull; {viewingDoc.extractedText.length.toLocaleString('id-ID')} karakter
+            </div>
+          </div>
+          <div className="mk-doc-view-content">
+            <pre>{viewingDoc.extractedText}</pre>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

@@ -235,6 +235,7 @@ export function MasterBerkasPage({ onBack }: MasterBerkasPageProps) {
         <div style={{ width: 1, height: 20, background: '#e0e0e0' }} />
         <h1 className="mk-header-title">Master Berkas</h1>
         <span className="mk-header-sub">Dokumen referensi untuk AI</span>
+        <div style={{ flex: 1 }} />
         <button className="mk-header-info" onClick={() => setShowInfoDialog(true)}>
           <InfoIcon size={14} />
         </button>

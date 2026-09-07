@@ -361,20 +361,22 @@ export function MasterBerkasPage({ onBack }: MasterBerkasPageProps) {
                           <FileIcon size={14} />
                           {getFileTypeLabel(doc.fileType)}
                         </div>
-                        <button
-                          className="mk-doc-card-view"
-                          onClick={() => setViewingDoc(doc)}
-                          title="Lihat konten ekstraksi"
-                        >
-                          <PreviewIcon size={14} />
-                        </button>
-                        <button
-                          className="mk-doc-card-delete"
-                          onClick={() => setConfirmDeleteDoc(doc.id)}
-                          title="Hapus dokumen"
-                        >
-                          <TrashIcon size={14} />
-                        </button>
+                        <div className="mk-doc-card-actions">
+                          <button
+                            className="mk-doc-card-view"
+                            onClick={() => setViewingDoc(doc)}
+                            title="Lihat konten ekstraksi"
+                          >
+                            <PreviewIcon size={14} />
+                          </button>
+                          <button
+                            className="mk-doc-card-delete"
+                            onClick={() => setConfirmDeleteDoc(doc.id)}
+                            title="Hapus dokumen"
+                          >
+                            <TrashIcon size={14} />
+                          </button>
+                        </div>
                       </div>
                       <div className="mk-doc-card-name" title={doc.name}>
                         {doc.name}

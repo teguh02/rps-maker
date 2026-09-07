@@ -6,6 +6,7 @@ import { AISettingsDialog } from './components/AISettingsDialog'
 import { ImportDialog } from './components/ImportDialog'
 import { GuidePage, guideSections } from './components/GuidePage'
 import { PreviewPage } from './components/PreviewPage'
+import { MasterBerkasPage } from './components/MasterBerkasPage'
 import { exportDocx, exportPdf } from './services/export'
 import { logger } from './utils/logger'
 
@@ -89,6 +90,7 @@ function App() {
   const [showImport, setShowImport] = useState(false)
   const [activeGuide, setActiveGuide] = useState<string | null>(null)
   const [showPreview, setShowPreview] = useState(false)
+  const [showMasterBerkas, setShowMasterBerkas] = useState(false)
   const [autoSaveActive, setAutoSaveActive] = useState(false)
   const [lastAutoSaveAt, setLastAutoSaveAt] = useState<string | null>(null)
   const [toast, setToast] = useState<{ message: string; type: 'info' | 'warning' | 'error' } | null>(null)
@@ -265,8 +267,8 @@ function App() {
   handlersRef.current = { handleNewProject, handleSaveProject, handleSaveAs, handleOpenProject, handleExport }
 
   // Keep latest dialog state so the Esc key handler (registered once) never goes stale.
-  const uiRef = useRef({ showImport, showAISettings, activeGuide, showPreview })
-  uiRef.current = { showImport, showAISettings, activeGuide, showPreview }
+  const uiRef = useRef({ showImport, showAISettings, activeGuide, showPreview, showMasterBerkas })
+  uiRef.current = { showImport, showAISettings, activeGuide, showPreview, showMasterBerkas }
 
   useEffect(() => {
     loadRecentFiles()
@@ -284,7 +286,8 @@ function App() {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key !== 'Escape') return
       const ui = uiRef.current
-      if (ui.showPreview) setShowPreview(false)
+      if (ui.showMasterBerkas) setShowMasterBerkas(false)
+      else if (ui.showPreview) setShowPreview(false)
       else if (ui.activeGuide) setActiveGuide(null)
       else if (ui.showImport) setShowImport(false)
       else if (ui.showAISettings) setShowAISettings(false)
@@ -355,6 +358,13 @@ function App() {
     )
   }
 
+  // Full-page master berkas (AI ribbon → Master Berkas)
+  if (showMasterBerkas) {
+    return (
+      <MasterBerkasPage onBack={() => setShowMasterBerkas(false)} />
+    )
+  }
+
   return (
     <div className="flex h-screen bg-gray-100">
       {activeGuide && guideSections.includes(activeGuide) ? (
@@ -375,12 +385,20 @@ function App() {
             logger.info('APP', 'open_preview')
             setShowPreview(true)
           }}
+          onOpenMasterBerkas={() => setShowMasterBerkas(true)}
           autoSaveActive={autoSaveActive}
           lastAutoSaveAt={lastAutoSaveAt}
           showToast={showToast}
         />
       )}
-      <AISettingsDialog open={showAISettings} onClose={() => setShowAISettings(false)} />
+      <AISettingsDialog
+        open={showAISettings}
+        onClose={() => setShowAISettings(false)}
+        onOpenMasterBerkas={() => {
+          setShowAISettings(false)
+          setShowMasterBerkas(true)
+        }}
+      />
       <ImportDialog open={showImport} onClose={() => setShowImport(false)} onImport={(data) => {
         logger.info('APP', 'project.import_data', { fields: Object.keys(data) })
         if (project) {

@@ -652,6 +652,82 @@ function buildAppMenu() {
   return Menu.buildFromTemplate(template);
 }
 
+/* ── Master Berkas: file-based RAG storage ── */
+const mammoth = require('mammoth');
+const XLSX = require('xlsx');
+const crypto = require('crypto');
+
+function getMasterBerkasPath() {
+  return path.join(app.getPath('userData'), 'master-berkas.json');
+}
+
+function readMasterBerkas() {
+  const filePath = getMasterBerkasPath();
+  if (!fs.existsSync(filePath)) return { groups: [], activeGroupId: null };
+  try {
+    return JSON.parse(fs.readFileSync(filePath, 'utf-8'));
+  } catch {
+    return { groups: [], activeGroupId: null };
+  }
+}
+
+function writeMasterBerkas(data) {
+  fs.writeFileSync(getMasterBerkasPath(), JSON.stringify(data, null, 2), 'utf-8');
+}
+
+async function extractFileContent(buffer, extension) {
+  const ext = extension.toLowerCase();
+  if (ext === '.pdf') {
+    const { PDFParse } = require('pdf-parse');
+    const parser = new PDFParse({ data: buffer });
+    await parser.load();
+    const result = await parser.getText();
+    return result.text || '';
+  }
+  if (ext === '.docx') {
+    const result = await mammoth.extractRawText({ buffer });
+    return result.value || '';
+  }
+  if (ext === '.csv') {
+    return buffer.toString('utf-8').replace(/^\uFEFF/, '');
+  }
+  if (ext === '.xlsx') {
+    const workbook = XLSX.read(buffer, { type: 'buffer' });
+    if (!workbook.SheetNames.length) return '';
+    const allText = workbook.SheetNames.map(name => {
+      const csv = XLSX.utils.sheet_to_csv(workbook.Sheets[name]);
+      return `--- Sheet: ${name} ---\n${csv}`;
+    }).join('\n\n');
+    return allText;
+  }
+  throw new Error(`Unsupported file type: ${ext}`);
+}
+
+ipcMain.handle('master-berkas:load', () => {
+  log.info('MASTER_BERKAS', 'load');
+  return readMasterBerkas();
+});
+
+ipcMain.handle('master-berkas:save', (_event, data) => {
+  log.info('MASTER_BERKAS', 'save', { groups: data.groups?.length });
+  writeMasterBerkas(data);
+  return true;
+});
+
+ipcMain.handle('master-berkas:extract', async (_event, { buffer, fileName }) => {
+  log.info('MASTER_BERKAS', 'extract', { fileName });
+  try {
+    const ext = path.extname(fileName);
+    const uint8 = new Uint8Array(buffer);
+    const extractedText = await extractFileContent(Buffer.from(uint8), ext);
+    log.info('MASTER_BERKAS', 'extract_done', { fileName, textLength: extractedText.length });
+    return { ok: true, extractedText, fileName };
+  } catch (err) {
+    log.error('MASTER_BERKAS', 'extract_error', { fileName, error: err.message });
+    return { ok: false, error: err.message };
+  }
+});
+
 app.whenReady().then(() => {
   createWindow();
 

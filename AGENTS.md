@@ -28,14 +28,26 @@
 │   │   ├── StartScreen.tsx # Start screen with recent files
 │   │   ├── RTE.tsx    # TipTap rich text editor wrapper
 │   │   ├── icons.tsx  # SVG icons
-│   │   └── ImportDialog.tsx # CSV import dialog
+│   │   ├── ImportDialog.tsx # CSV import dialog
+│   │   ├── MasterBerkasPage.tsx # Master document management (RAG system)
+│   │   ├── AISettingsDialog.tsx # AI settings + master berkas group selector
+│   │   ├── AboutModal.tsx # About dialog
+│   │   ├── SettingsModal.tsx # Global user identity settings
+│   │   └── StructuredList.tsx # Extracted structured list component
 │   ├── services/
-│   │   ├── ai.ts      # AI service (free/custom provider)
-│   │   └── export.ts  # DOCX + PDF export
+│   │   ├── ai.ts      # AI service (free/custom provider) + master berkas injection
+│   │   ├── export.ts  # DOCX + PDF export
+│   │   ├── rpsTemplate.ts # HTML template for preview/export
+│   │   ├── rpsDataMapper.ts # Section builders for export
+│   │   ├── editorRegistry.ts # Active TipTap editor registry
+│   │   └── fontSizeExtension.ts # Custom TipTap font size extension
 │   ├── styles/
 │   │   └── index.css  # All custom CSS classes
 │   ├── utils/
-│   │   └── logger.ts  # Logging utility
+│   │   ├── logger.ts  # Logging utility
+│   │   └── html.ts    # stripHtml utility for AI prompts
+│   ├── templates/
+│   │   └── curriculum-data.ts # Per-prodi curriculum defaults
 │   └── App.tsx        # Main app component
 ├── public/
 │   └── guides/        # Guide screenshot images
@@ -79,7 +91,7 @@
 - **File**: `Ctrl+N` new, `Ctrl+O` open, `Ctrl+S` save, `Ctrl+Shift+S` save as, `Ctrl+E` export dialog, `Ctrl+P` export PDF, `Ctrl+Shift+E` export Word, `Ctrl+Shift+I` import
 - **Document editing** (window keydown in `Editor.tsx`): `Ctrl+Z`/`Ctrl+Y`/`Ctrl+Shift+Z` undo/redo **only when focus is outside an editable field** (inside an RTE/input the field's native undo wins); `F1` opens the guide for the active section; `Esc` closes context menu/shortcuts dialog; zoom `Ctrl+0` reset, `Ctrl+=` in, `Ctrl+-` out, `Ctrl+wheel` zoom
 - **In-editor (TipTap built-ins)**: `Ctrl+B/I/U`, `Ctrl+Shift+X` strikethrough, `Ctrl+Shift+7/8` lists, `Ctrl+Shift+V` paste-as-plain-text (RTE `handlePaste` shiftKey branch)
-- **Dialogs**: `Esc` closes guide → import → AI settings (App-level keydown)
+- **Dialogs**: `Esc` closes master berkas → guide → import → AI settings (App-level keydown)
 - **Reference UI**: `ShortcutsDialog.tsx` (Help ribbon → Shortcuts button)
 
 ### Guide System
@@ -106,6 +118,21 @@
 - Activates only after the project has a real file path (first manual save / open)
 - Writes silently via `project:save-silent` IPC (no dialog) every 15s when content changed
 - Indicator dot + last-save time shown at the right of the section tabs bar
+
+### Master Berkas (RAG System)
+- **Purpose**: Upload reference documents (silabus, RPS lama, kurikulum) that AI uses as context when generating RPS content
+- **Storage**: Global in `userData/master-berkas.json` (not per-project), managed via IPC
+- **Supported formats**: PDF (pdf-parse), DOCX (mammoth), XLSX/CSV (xlsx)
+- **Grouping**: Documents organized into named groups (free text input). One group can be "active" at a time
+- **Max documents**: 6 per group
+- **UI**: Full-page manager (AI ribbon → "Master Berkas" button), also accessible from AISettingsDialog via "Kelola" button
+- **Data flow**:
+  1. User uploads file → main process extracts text via `master-berkas:extract` IPC
+  2. Extracted text stored in `master-berkas.json` (persistent) AND synced to `localStorage` (`rps-master-berkas-data`)
+  3. When AI generates content, `getMasterBerkasContext()` reads localStorage → appends ALL extracted text to system prompt
+  4. Each section gets conditional instructions (e.g., CPL: "Gunakan kurikulum/silabus dari dokumen referensi...", Pustaka: "Gunakan daftar pustaka dari dokumen...")
+- **AI settings**: Dropdown in AISettingsDialog to select active group + toggle on MasterBerkasPage
+- **Dependencies**: `mammoth`, `pdf-parse`, `xlsx`, `uuid` (installed via npm)
 
 ### Export (DOCX + PDF)
 - Both match the Excel→HTML reference (`referensi/.../rps-konversi-sendiri.html`): **A4 landscape**, Times New Roman, 14-column bordered table
@@ -150,6 +177,7 @@
 - **Custom provider**: User-provided host/key/model
 - **CORS fix**: IPC handler in main.js with Node.js fetch
 - **Web search**: enabled automatically for any openrouter.ai host (web plugin, max 5 results) — free models included
+- **Master berkas injection**: `getMasterBerkasContext()` reads active group from localStorage → appends all extracted document text to system prompt → per-section conditional instructions guide AI how to use the documents
 
 ### Field Consolidation
 - All identity fields moved to Identitas tab

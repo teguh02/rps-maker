@@ -44,6 +44,10 @@ declare global {
     installUpdate: () => Promise<{ ok: boolean; dev?: boolean; action?: string; error?: string }>
     onUpdateProgress: (callback: (data: { received: number; total: number; percent: number }) => void) => () => void
 
+    masterBerkasLoad: () => Promise<any>
+    masterBerkasSave: (data: any) => Promise<void>
+    masterBerkasExtract: (data: { buffer: number[]; fileName: string }) => Promise<{ ok: boolean; extractedText?: string; error?: string }>
+
     platform: string
   }
 

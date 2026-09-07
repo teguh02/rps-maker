@@ -52,6 +52,62 @@ function stripHtml(html: string): string {
   return plainLines(html).join('\n')
 }
 
+// ponytail: inline HTML→TextRun parser, keeps bold/italic
+function richRuns(html: string, baseSize: number, baseFont: { ascii: string; hAnsi: string; cs: string }, forceBold = false): TextRun[] {
+  const text = (html || '')
+    .replace(/<br\s*\/?>/gi, '\n')
+    .replace(/<\/(p|div|li|h[1-6])>/gi, '\n')
+    .replace(/&nbsp;/g, ' ')
+    .replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&quot;/g, '"').replace(/&#39;/g, "'")
+  const lines = text.split('\n')
+  const runs: TextRun[] = []
+  for (let li = 0; li < lines.length; li++) {
+    const line = lines[li].trim()
+    if (!line && li < lines.length - 1) continue
+    // Simple regex-based inline formatting extraction
+    const inlineRe = /<(b|strong|i|em|u|s|strike)(?:\s[^>]*)?>([\s\S]*?)<\/\1>/gi
+    let cursor = 0
+    const lineLower = line.toLowerCase()
+    // For simplicity, extract text segments with bold/italic flags
+    const segments: { text: string; bold?: boolean; italics?: boolean; underline?: boolean; strike?: boolean }[] = []
+    let m: RegExpExecArray | null
+    while ((m = inlineRe.exec(line)) !== null) {
+      if (m.index > cursor) {
+        const before = line.slice(cursor, m.index).replace(/<[^>]+>/g, '').trim()
+        if (before) segments.push({ text: before })
+      }
+      const tag = m[1].toLowerCase()
+      const inner = m[2].replace(/<[^>]+>/g, '')
+      if (tag === 'b' || tag === 'strong') segments.push({ text: inner, bold: true })
+      else if (tag === 'i' || tag === 'em') segments.push({ text: inner, italics: true })
+      else if (tag === 'u') segments.push({ text: inner, underline: true })
+      else if (tag === 's' || tag === 'strike') segments.push({ text: inner, strike: true })
+      cursor = m.index + m[0].length
+    }
+    if (cursor < line.length) {
+      const rest = line.slice(cursor).replace(/<[^>]+>/g, '').trim()
+      if (rest) segments.push({ text: rest })
+    }
+    if (segments.length === 0 && line) {
+      segments.push({ text: line.replace(/<[^>]+>/g, '') })
+    }
+    for (const seg of segments) {
+      if (!seg.text) continue
+      runs.push(new TextRun({
+        text: seg.text,
+        bold: seg.bold || forceBold,
+        italics: seg.italics,
+        size: baseSize,
+        font: baseFont,
+      }))
+    }
+    if (li < lines.length - 1) {
+      runs.push(new TextRun({ text: '', break: 1, size: baseSize, font: baseFont }))
+    }
+  }
+  return runs
+}
+
 interface StructuredItem {
   label?: string
   deskripsi?: string
@@ -105,10 +161,10 @@ const FONT = 'Times New Roman'
 const FONT_TWIPS = { ascii: FONT, hAnsi: FONT, cs: FONT }
 
 const cellBorders = {
-  top: { style: BorderStyle.SINGLE, size: 4, color: '000000' },
-  bottom: { style: BorderStyle.SINGLE, size: 4, color: '000000' },
-  left: { style: BorderStyle.SINGLE, size: 4, color: '000000' },
-  right: { style: BorderStyle.SINGLE, size: 4, color: '000000' },
+  top: { style: BorderStyle.SINGLE, size: 12, color: '000000' },
+  bottom: { style: BorderStyle.SINGLE, size: 12, color: '000000' },
+  left: { style: BorderStyle.SINGLE, size: 12, color: '000000' },
+  right: { style: BorderStyle.SINGLE, size: 12, color: '000000' },
 }
 
 const noBorderBorders = {
@@ -118,7 +174,7 @@ const noBorderBorders = {
   right: { style: BorderStyle.NONE, size: 0 },
 }
 
-/** Helper: single-line text cell */
+/** Helper: single-line text cell (plain, no formatting) */
 function tc(text: string, opts: { bold?: boolean; center?: boolean; size?: number; fill?: string; widthPct?: number; colSpan?: number; rowSpan?: number; noBorder?: boolean; align?: typeof AlignmentType[keyof typeof AlignmentType] } = {}): TableCell {
   const runs: TextRun[] = plainLines(text).map((line, i) =>
     new TextRun({
@@ -137,7 +193,7 @@ function tc(text: string, opts: { bold?: boolean; center?: boolean; size?: numbe
     width: opts.widthPct != null ? { size: opts.widthPct, type: WidthType.PERCENTAGE } : undefined,
     verticalAlign: VerticalAlign.CENTER,
     shading: opts.fill ? { type: ShadingType.CLEAR, fill: opts.fill } : undefined,
-    margins: { top: 40, bottom: 40, left: 80, right: 80 },
+    margins: { top: 20, bottom: 20, left: 40, right: 40 },
     borders: opts.noBorder ? noBorderBorders : cellBorders,
     children: [new Paragraph({
       alignment: opts.align || (opts.center ? AlignmentType.CENTER : AlignmentType.LEFT),
@@ -147,9 +203,27 @@ function tc(text: string, opts: { bold?: boolean; center?: boolean; size?: numbe
   })
 }
 
-/** Helper: multi-line rich text cell */
-function rc(html: string, opts: { size?: number; widthPct?: number; colSpan?: number; rowSpan?: number } = {}): TableCell {
-  return tc(stripHtml(html), opts)
+/** Helper: rich text cell (preserves bold/italic/underline) */
+function rc(html: string, opts: { size?: number; widthPct?: number; colSpan?: number; rowSpan?: number; fill?: string; bold?: boolean; center?: boolean; noBorder?: boolean } = {}): TableCell {
+  const size = opts.size ?? 20
+  const runs = richRuns(html, size, FONT_TWIPS, opts.bold)
+  if (runs.length === 0) {
+    runs.push(new TextRun({ text: '', size, font: FONT_TWIPS }))
+  }
+  return new TableCell({
+    columnSpan: opts.colSpan,
+    rowSpan: opts.rowSpan,
+    width: opts.widthPct != null ? { size: opts.widthPct, type: WidthType.PERCENTAGE } : undefined,
+    verticalAlign: VerticalAlign.CENTER,
+    shading: opts.fill ? { type: ShadingType.CLEAR, fill: opts.fill } : undefined,
+    margins: { top: 20, bottom: 20, left: 40, right: 40 },
+    borders: opts.noBorder ? noBorderBorders : cellBorders,
+    children: [new Paragraph({
+      alignment: opts.center ? AlignmentType.CENTER : AlignmentType.LEFT,
+      spacing: { after: 0 },
+      children: runs,
+    })],
+  })
 }
 
 function tr(cells: TableCell[]): TableRow {
@@ -157,7 +231,11 @@ function tr(cells: TableCell[]): TableRow {
 }
 
 function tbl(rows: TableRow[], widthPct = 100): Table {
-  return new Table({ width: { size: widthPct, type: WidthType.PERCENTAGE }, rows })
+  return new Table({
+    width: { size: widthPct, type: WidthType.PERCENTAGE },
+    layout: 'fixed' as any, // Force fixed column widths
+    rows,
+  })
 }
 
 /** Empty paragraph with spacing */
@@ -210,53 +288,63 @@ function buildContentTable(c: Record<string, string>, logoData: string | null): 
   const sem = c.semester === 'Ganjil' ? 'GANJIL' : c.semester === 'Genap' ? 'GENAP' : (c.semester || '').toUpperCase()
   const docCode = `RPS/${prodiCode(c)}/${sem}/${(ta.split('-')[1] || '20__').trim()}`
 
-  const W = [7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7] // 14 × 7.14 ≈ 100
+  // ponytail: each column ~7.14%, colSpan N → N*7.14
+  const W = (n: number) => Math.round(n * 7.14 * 100) / 100
   const rows: TableRow[] = []
 
   // ── Header block (rows 1-3): logo + STIKES + prodi + tahun akademik + doc code ──
-  // Row 1: logo (colspan=2, rowspan=3) + "STIKES IBNU SINA AJIBARANG" (colspan=12, rowspan=3)
   const logoCell = logoData
     ? new TableCell({
         columnSpan: 2, rowSpan: 3,
         verticalAlign: VerticalAlign.CENTER,
         borders: cellBorders,
-        margins: { top: 40, bottom: 40, left: 80, right: 80 },
+        margins: { top: 20, bottom: 20, left: 40, right: 40 },
+        width: { size: W(2), type: WidthType.PERCENTAGE },
         children: [new Paragraph({
           alignment: AlignmentType.CENTER,
           children: [new ImageRun({ data: logoData, type: 'png' as any, transformation: { width: 80, height: 80 } })],
         })],
       })
-    : tc('', { colSpan: 2, rowSpan: 3 })
+    : tc('', { colSpan: 2, rowSpan: 3, widthPct: W(2) })
 
   rows.push(tr([
     logoCell,
-    tc('STIKES IBNU SINA AJIBARANG', { bold: true, center: true, size: 24, colSpan: 12, rowSpan: 3 }),
+    tc('STIKES IBNU SINA AJIBARANG', { bold: true, center: true, size: 28, colSpan: 10, rowSpan: 3, widthPct: W(10) }),
+    tc(docCode, { center: true, size: 18, colSpan: 2, rowSpan: 3, widthPct: W(2) }),
   ]))
 
-  // Row 4: Title
+  // Row 2-3 are filled by rowspan, now Row 4: Title
   rows.push(tr([
-    tc('RENCANA PEMBELAJARAN SEMESTER', { bold: true, center: true, size: 22, colSpan: 14 }),
+    tc('PROGRAM STUDI ' + (c.prodi || '').toUpperCase(), { bold: true, center: true, size: 22, colSpan: 14, widthPct: W(14) }),
+  ]))
+  rows.push(tr([
+    tc('TAHUN AKADEMIK ' + ta, { bold: true, center: true, size: 22, colSpan: 14, widthPct: W(14) }),
   ]))
 
-  // ── Identitas ──
-  // Header row: 4 labels + 10 labels = 14
+  // Row 5: Title
   rows.push(tr([
-    tc('MATA KULIAH (MK)', { bold: true, fill: 'F0F0F0', colSpan: 4 }),
-    tc(c.mata_kuliah || '', { colSpan: 2 }),
-    tc('Rumpun MK', { bold: true, center: true, fill: 'F0F0F0', colSpan: 3 }),
-    tc(c.rumpun_mk || '', { colSpan: 2 }),
-    tc('Kode', { bold: true, center: true, fill: 'F0F0F0', colSpan: 1 }),
-    tc(c.kode_mk || '', { colSpan: 2 }),
+    tc('RENCANA PEMBELAJARAN SEMESTER', { bold: true, center: true, size: 22, colSpan: 14, widthPct: W(14) }),
   ]))
 
-  // BOBOT / SKS
+  // ── Identitas Header ──
   rows.push(tr([
-    tc('Bobot (sks)', { bold: true, fill: 'F0F0F0', colSpan: 4 }),
-    tc(`T = ${sksT}    P = ${sksP}`, { colSpan: 2 }),
-    tc('Semester', { bold: true, center: true, fill: 'F0F0F0', colSpan: 3 }),
-    tc(c.semester || '', { colSpan: 2 }),
-    tc('Tgl Penyusunan', { bold: true, center: true, fill: 'F0F0F0', colSpan: 1 }),
-    tc(fullDate(c.tgl_penyusunan) || '-', { colSpan: 2 }),
+    tc('MATA KULIAH (MK)', { bold: true, fill: 'F0F0F0', colSpan: 4, widthPct: W(4) }),
+    tc('KODE', { bold: true, center: true, fill: 'F0F0F0', colSpan: 2, widthPct: W(2) }),
+    tc('Rumpun MK', { bold: true, center: true, fill: 'F0F0F0', colSpan: 3, widthPct: W(3) }),
+    tc('BOBOT (sks)', { bold: true, center: true, fill: 'F0F0F0', colSpan: 2, widthPct: W(2) }),
+    tc('SEMESTER', { bold: true, center: true, fill: 'F0F0F0', colSpan: 1, widthPct: W(1) }),
+    tc('Tgl Penyusunan', { bold: true, center: true, fill: 'F0F0F0', colSpan: 2, widthPct: W(2) }),
+  ]))
+
+  // ── Identitas Values ──
+  rows.push(tr([
+    tc(c.mata_kuliah || '', { colSpan: 4, widthPct: W(4) }),
+    tc(c.kode_mk || '', { colSpan: 2, widthPct: W(2) }),
+    tc(c.rumpun_mk || '', { colSpan: 3, widthPct: W(3) }),
+    tc(`T= ${sksT}`, { colSpan: 1, widthPct: W(1) }),
+    tc(`P= ${sksP}`, { colSpan: 1, widthPct: W(1) }),
+    tc(c.semester || '', { colSpan: 1, widthPct: W(1) }),
+    tc(fullDate(c.tgl_penyusunan) || '-', { colSpan: 2, widthPct: W(2) }),
   ]))
 
   // Dosen Pengampu (full row)
@@ -273,17 +361,15 @@ function buildContentTable(c: Record<string, string>, logoData: string | null): 
 
   // ── Otorisasi (2 rows) ──
   rows.push(tr([
-    tc('Otorisasi', { bold: true, fill: 'F0F0F0', colSpan: 2, rowSpan: 2 }),
-    tc('Pengembang RPS', { bold: true, center: true, fill: 'F0F0F0', colSpan: 3 }),
-    tc('Koordinator RMK', { bold: true, center: true, fill: 'F0F0F0', colSpan: 4 }),
-    tc('Ketua Program Studi', { bold: true, center: true, fill: 'F0F0F0', colSpan: 3 }),
-    tc('', { colSpan: 2 }),
+    tc('OTORISASI', { bold: true, fill: 'F0F0F0', colSpan: 4, rowSpan: 2, widthPct: W(4) }),
+    tc('Pengembang RPS', { bold: true, center: true, fill: 'F0F0F0', colSpan: 3, widthPct: W(3) }),
+    tc('Koordinator RMK', { bold: true, center: true, fill: 'F0F0F0', colSpan: 4, widthPct: W(4) }),
+    tc('Ketua Program Studi', { bold: true, center: true, fill: 'F0F0F0', colSpan: 3, widthPct: W(3) }),
   ]))
   rows.push(tr([
-    tc(`\n\n${c.pengembang_rps || ''}\n${c.nidn_pengembang ? `NIDN. ${c.nidn_pengembang}` : ''}`, { center: true, colSpan: 3 }),
-    tc(`\n\n${c.koordinator_rmk || ''}`, { center: true, colSpan: 4 }),
-    tc(`\n\n${c.kaprodi || ''}\n${c.nidn_kaprodi ? `NIDN. ${c.nidn_kaprodi}` : ''}`, { center: true, colSpan: 3 }),
-    tc('', { colSpan: 2 }),
+    tc(`\n${c.pengembang_rps || ''}\n${c.nidn_pengembang ? `NIDN. ${c.nidn_pengembang}` : ''}`, { center: true, colSpan: 3, widthPct: W(3) }),
+    tc(`\n${c.koordinator_rmk || ''}`, { center: true, colSpan: 4, widthPct: W(4) }),
+    tc(`\n${c.kaprodi || ''}\n${c.nidn_kaprodi ? `NIDN. ${c.nidn_kaprodi}` : ''}`, { center: true, colSpan: 3, widthPct: W(3) }),
   ]))
 
   // ── CPL / CPMK / Sub-CPMK ──
@@ -291,20 +377,20 @@ function buildContentTable(c: Record<string, string>, logoData: string | null): 
     const result: TableRow[] = []
     if (items.length === 0) {
       result.push(tr([
-        tc(label, { bold: true, fill: 'F0F0F0', colSpan: 2, rowSpan: 1 }),
-        tc('-', { colSpan: 12 }),
+        tc(label, { bold: true, fill: 'F0F0F0', colSpan: 2, rowSpan: 1, widthPct: W(2) }),
+        tc('-', { colSpan: 12, widthPct: W(12) }),
       ]))
       return result
     }
     result.push(tr([
-      tc(label, { bold: true, fill: 'F0F0F0', colSpan: 2, rowSpan: items.length }),
-      tc(items[0].label || '', { bold: true, colSpan: 5 }),
-      tc(stripHtml(items[0].deskripsi || ''), { colSpan: 7 }),
+      tc(label, { bold: true, fill: 'F0F0F0', colSpan: 2, rowSpan: items.length, widthPct: W(2) }),
+      tc(items[0].label || '', { bold: true, colSpan: 5, widthPct: W(5) }),
+      rc(items[0].deskripsi || '', { colSpan: 7, widthPct: W(7) }),
     ]))
     for (let i = 1; i < items.length; i++) {
       result.push(tr([
-        tc(items[i].label || '', { bold: true, colSpan: 5 }),
-        tc(stripHtml(items[i].deskripsi || ''), { colSpan: 7 }),
+        tc(items[i].label || '', { bold: true, colSpan: 5, widthPct: W(5) }),
+        rc(items[i].deskripsi || '', { colSpan: 7, widthPct: W(7) }),
       ]))
     }
     return result
@@ -316,27 +402,25 @@ function buildContentTable(c: Record<string, string>, logoData: string | null): 
 
   // ── Deskripsi ──
   rows.push(tr([
-    tc('Deskripsi Singkat Mata Kuliah', { bold: true, fill: 'F0F0F0', colSpan: 2 }),
-    tc(stripHtml(c.deskripsi_mk || ''), { colSpan: 12 }),
+    tc('Deskripsi Singkat Mata Kuliah', { bold: true, fill: 'F0F0F0', colSpan: 2, widthPct: W(2) }),
+    rc(c.deskripsi_mk || '', { colSpan: 12, widthPct: W(12) }),
   ]))
 
   // ── Bahan Kajian ──
   const bahan = parseStructured(c.bahan_kajian)
   if (bahan.length === 0) {
     rows.push(tr([
-      tc('Bahan Kajian : Materi Pembelajaran', { bold: true, fill: 'F0F0F0', colSpan: 2, rowSpan: 1 }),
-      tc('-', { colSpan: 12 }),
+      tc('Bahan Kajian:\nMateri Pembelajaran', { bold: true, fill: 'F0F0F0', colSpan: 2, rowSpan: 1, widthPct: W(2) }),
+      tc('-', { colSpan: 12, widthPct: W(12) }),
     ]))
   } else {
     rows.push(tr([
-      tc('Bahan Kajian : Materi Pembelajaran', { bold: true, fill: 'F0F0F0', colSpan: 2, rowSpan: bahan.length }),
-      tc(bahan[0].label || '', { bold: true, colSpan: 5 }),
-      tc(stripHtml(bahan[0].deskripsi || bahan[0].judul || ''), { colSpan: 7 }),
+      tc('Bahan Kajian:\nMateri Pembelajaran', { bold: true, fill: 'F0F0F0', colSpan: 2, rowSpan: bahan.length, widthPct: W(2) }),
+      tc(`${bahan[0].label || ''}. ${bahan[0].deskripsi || bahan[0].judul || ''}`, { colSpan: 12, widthPct: W(12) }),
     ]))
     for (let i = 1; i < bahan.length; i++) {
       rows.push(tr([
-        tc(bahan[i].label || '', { bold: true, colSpan: 5 }),
-        tc(stripHtml(bahan[i].deskripsi || bahan[i].judul || ''), { colSpan: 7 }),
+        tc(`${bahan[i].label || ''}. ${bahan[i].deskripsi || bahan[i].judul || ''}`, { colSpan: 12, widthPct: W(12) }),
       ]))
     }
   }
@@ -345,34 +429,69 @@ function buildContentTable(c: Record<string, string>, logoData: string | null): 
   const penilaian = parsePenilaian(c.penilaian)
   if (penilaian.length === 0) {
     rows.push(tr([
-      tc('Penilaian', { bold: true, fill: 'F0F0F0', colSpan: 2, rowSpan: 1 }),
-      tc('-', { colSpan: 12 }),
+      tc('Penilaian', { bold: true, fill: 'F0F0F0', colSpan: 2, rowSpan: 1, widthPct: W(2) }),
+      tc('-', { colSpan: 12, widthPct: W(12) }),
     ]))
   } else {
     rows.push(tr([
-      tc('Penilaian', { bold: true, fill: 'F0F0F0', colSpan: 2, rowSpan: penilaian.length }),
-      tc(penilaian[0].item || '', { colSpan: 5 }),
-      tc(`${penilaian[0].bobot || 0}%`, { colSpan: 7 }),
+      tc('Penilaian', { bold: true, fill: 'F0F0F0', colSpan: 2, rowSpan: penilaian.length, widthPct: W(2) }),
+      tc(`${penilaian[0].item} : ${penilaian[0].bobot}%`, { colSpan: 12, widthPct: W(12) }),
     ]))
     for (let i = 1; i < penilaian.length; i++) {
       rows.push(tr([
-        tc(penilaian[i].item || '', { colSpan: 5 }),
-        tc(`${penilaian[i].bobot || 0}%`, { colSpan: 7 }),
+        tc(`${penilaian[i].item} : ${penilaian[i].bobot}%`, { colSpan: 12, widthPct: W(12) }),
       ]))
     }
   }
 
-  // ── Pustaka ──
-  const pustakaLines: string[] = []
-  if (c.pustaka_utama) {
-    pustakaLines.push('Utama:', ...plainLines(c.pustaka_utama))
-  }
-  if (c.pustaka_pendukung) {
-    pustakaLines.push('Pendukung:', ...plainLines(c.pustaka_pendukung))
-  }
+  // ── Pustaka (matching HTML template: rowspan + "Utama:" header + individual rows) ──
+  const pustakaUtama = plainLines(c.pustaka_utama)
+  const pustakaPendukung = plainLines(c.pustaka_pendukung)
+  const totalPustakaRows = 1 + Math.max(pustakaUtama.length, 1) + (pustakaPendukung.length > 0 ? 1 + pustakaPendukung.length : 0)
+
+  // Row 1: "Pustaka" label (rowspan) + "Utama:" header
   rows.push(tr([
-    tc('Pustaka', { bold: true, fill: 'F0F0F0', colSpan: 2 }),
-    tc(pustakaLines.join('\n'), { colSpan: 12 }),
+    tc('Pustaka', { bold: true, fill: 'F0F0F0', colSpan: 2, rowSpan: totalPustakaRows, widthPct: W(2) }),
+    tc('Utama :', { bold: true, colSpan: 2, widthPct: W(2) }),
+    tc('', { colSpan: 10, widthPct: W(10) }),
+  ]))
+
+  // Utama lines
+  if (pustakaUtama.length === 0) {
+    rows.push(tr([
+      tc('-', { colSpan: 12, widthPct: W(12) }),
+    ]))
+  } else {
+    pustakaUtama.forEach(line => {
+      rows.push(tr([
+        rc(line, { colSpan: 12, widthPct: W(12) }),
+      ]))
+    })
+  }
+
+  // Pendukung header + lines
+  if (pustakaPendukung.length > 0) {
+    rows.push(tr([
+      tc('Pendukung :', { bold: true, colSpan: 2, widthPct: W(2) }),
+      tc('', { colSpan: 10, widthPct: W(10) }),
+    ]))
+    pustakaPendukung.forEach((line, i) => {
+      rows.push(tr([
+        rc(`${i + 1}. ${line}`, { colSpan: 12, widthPct: W(12) }),
+      ]))
+    })
+  }
+
+  // ── Dosen Pengampu ──
+  rows.push(tr([
+    tc('Dosen Pengampu', { bold: true, fill: 'F0F0F0', colSpan: 2, widthPct: W(2) }),
+    tc(c.dosen_pengampu || '', { colSpan: 12, widthPct: W(12) }),
+  ]))
+
+  // ── Matakuliah Syarat ──
+  rows.push(tr([
+    tc('Matakuliah Syarat', { bold: true, fill: 'F0F0F0', colSpan: 2, widthPct: W(2) }),
+    tc(c.matakuliah_syarat || '-', { colSpan: 12, widthPct: W(12) }),
   ]))
 
   return tbl(rows)
@@ -390,47 +509,49 @@ function buildContentTable(c: Record<string, string>, logoData: string | null): 
 function buildPertemuanTable(c: Record<string, string>): Table {
   const pertemuan = parsePertemuan(c.pertemuan)
   const rows: TableRow[] = []
+  // 8 columns: each ~12.5%
+  const W8 = (n: number) => Math.round(n * 12.5 * 100) / 100
 
   // Header row 1
   rows.push(tr([
-    tc('No', { bold: true, center: true, fill: 'F0F0F0', rowSpan: 2 }),
-    tc('Kemampuan akhir tiap tahapan belajar\n(Sub-CPMK)', { bold: true, center: true, fill: 'F0F0F0', rowSpan: 2 }),
-    tc('Penilaian', { bold: true, center: true, fill: 'F0F0F0', colSpan: 2 }),
-    tc('Bentuk Pembelajaran, Metode Pembelajaran,\nPenugasan Mahasiswa, [Estimasi Waktu]', { bold: true, center: true, fill: 'F0F0F0', colSpan: 2 }),
-    tc('Materi Pembelajaran\n[ Pustaka ]', { bold: true, center: true, fill: 'F0F0F0', rowSpan: 2 }),
-    tc('Bobot\nPenilaian (%)', { bold: true, center: true, fill: 'F0F0F0', rowSpan: 2 }),
+    tc('No', { bold: true, center: true, fill: 'F0F0F0', rowSpan: 2, widthPct: W8(1) }),
+    tc('Kemampuan akhir tiap tahapan belajar\n(Sub-CPMK)', { bold: true, center: true, fill: 'F0F0F0', rowSpan: 2, widthPct: W8(1) }),
+    tc('Penilaian', { bold: true, center: true, fill: 'F0F0F0', colSpan: 2, widthPct: W8(2) }),
+    tc('Bentuk Pembelajaran, Metode Pembelajaran,\nPenugasan Mahasiswa, [Estimasi Waktu]', { bold: true, center: true, fill: 'F0F0F0', colSpan: 2, widthPct: W8(2) }),
+    tc('Materi Pembelajaran\n[ Pustaka ]', { bold: true, center: true, fill: 'F0F0F0', rowSpan: 2, widthPct: W8(1) }),
+    tc('Bobot\nPenilaian (%)', { bold: true, center: true, fill: 'F0F0F0', rowSpan: 2, widthPct: W8(1) }),
   ]))
 
   // Header row 2
   rows.push(tr([
-    tc('Indikator', { bold: true, center: true, fill: 'F0F0F0' }),
-    tc('Kriteria & Teknik', { bold: true, center: true, fill: 'F0F0F0' }),
-    tc('Luring (offline)', { bold: true, center: true, fill: 'F0F0F0' }),
-    tc('Daring (online)', { bold: true, center: true, fill: 'F0F0F0' }),
+    tc('Indikator', { bold: true, center: true, fill: 'F0F0F0', widthPct: W8(1) }),
+    tc('Kriteria & Teknik', { bold: true, center: true, fill: 'F0F0F0', widthPct: W8(1) }),
+    tc('Luring (offline)', { bold: true, center: true, fill: 'F0F0F0', widthPct: W8(1) }),
+    tc('Daring (online)', { bold: true, center: true, fill: 'F0F0F0', widthPct: W8(1) }),
   ]))
 
   // Data rows
   if (pertemuan.length === 0) {
     rows.push(tr([
-      tc('Belum ada jadwal pertemuan. Gunakan "Generate dari Sub-CPMK" di tab Pertemuan.', { center: true, size: 16, colSpan: 8 }),
+      tc('Belum ada jadwal pertemuan. Gunakan "Generate dari Sub-CPMK" di tab Pertemuan.', { center: true, size: 16, colSpan: 8, widthPct: W8(8) }),
     ]))
   } else {
     pertemuan.forEach(r => {
       if (r.type === 'uts' || r.type === 'uas') {
         rows.push(tr([
-          tc(r.label || (r.type === 'uts' ? 'UTS (UJIAN TENGAH SEMESTER)' : 'Evaluasi Akhir Semester'), { bold: true, center: true, fill: 'F0F0F0', colSpan: 8 }),
+          tc(r.label || (r.type === 'uts' ? 'UTS (UJIAN TENGAH SEMESTER)' : 'Evaluasi Akhir Semester'), { bold: true, center: true, fill: 'F0F0F0', colSpan: 8, widthPct: W8(8) }),
         ]))
         return
       }
       rows.push(tr([
-        tc(String(r.no ?? ''), { center: true }),
-        tc(stripHtml(r.subCpmk || '')),
-        tc(stripHtml(r.indikator || '')),
-        tc(stripHtml(r.kriteriaTeknik || '')),
-        tc(stripHtml(r.luring || '')),
-        tc(stripHtml(r.daring || '')),
-        tc(stripHtml(r.materiPustaka || '')),
-        tc(String(r.bobot || 0), { center: true }),
+        tc(String(r.no ?? ''), { center: true, widthPct: W8(1) }),
+        rc(r.subCpmk || '', { widthPct: W8(1) }),
+        rc(r.indikator || '', { widthPct: W8(1) }),
+        rc(r.kriteriaTeknik || '', { widthPct: W8(1) }),
+        rc(r.luring || '', { widthPct: W8(1) }),
+        rc(r.daring || '', { widthPct: W8(1) }),
+        rc(r.materiPustaka || '', { widthPct: W8(1) }),
+        tc(String(r.bobot || 0), { center: true, widthPct: W8(1) }),
       ]))
     })
   }

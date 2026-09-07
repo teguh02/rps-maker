@@ -19,6 +19,7 @@ export function SettingsModal({ open, onClose }: SettingsModalProps) {
   const [kaprodi, setKaprodi] = useState('')
   const [ketuaStikes, setKetuaStikes] = useState('')
   const [saved, setSaved] = useState(false)
+  const [confirmReset, setConfirmReset] = useState(false)
 
   useEffect(() => {
     if (open) {
@@ -156,7 +157,7 @@ export function SettingsModal({ open, onClose }: SettingsModalProps) {
         </div>
 
         <div className="settings-footer">
-          <button className="settings-btn settings-btn-outline" onClick={handleReset}>
+          <button className="settings-btn settings-btn-outline" onClick={() => setConfirmReset(true)}>
             Reset ke Default
           </button>
           <div className="settings-footer-right">
@@ -167,6 +168,40 @@ export function SettingsModal({ open, onClose }: SettingsModalProps) {
           </div>
         </div>
       </div>
+
+      {/* Confirm Reset Dialog */}
+      {confirmReset && (
+        <div className="settings-overlay" onClick={() => setConfirmReset(false)}>
+          <div className="settings-modal" onClick={(e) => e.stopPropagation()} style={{ width: '400px' }}>
+            <div className="settings-header">
+              <span className="settings-icon">
+                <SettingsIcon size={18} />
+              </span>
+              <h2>Reset Pengaturan</h2>
+              <button className="settings-close" onClick={() => setConfirmReset(false)}>
+                <XIcon size={18} />
+              </button>
+            </div>
+            <div className="settings-body">
+              <p style={{ fontSize: 13, color: '#616161', lineHeight: 1.6, margin: 0 }}>
+                Semua pengaturan akan dihapus dan dikembalikan ke nilai default:
+              </p>
+              <ul style={{ fontSize: 12, color: '#9e9e9e', marginTop: 8, paddingLeft: 20 }}>
+                <li>Nama, NIDN, dan Prodi pengguna</li>
+                <li>Override Kaprodi dan Ketua STIKes</li>
+              </ul>
+            </div>
+            <div className="settings-footer">
+              <button className="settings-btn settings-btn-outline" onClick={() => setConfirmReset(false)}>
+                Batal
+              </button>
+              <button className="settings-btn settings-btn-primary" onClick={() => { handleReset(); setConfirmReset(false) }}>
+                Reset
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

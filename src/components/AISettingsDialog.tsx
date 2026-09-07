@@ -1,18 +1,28 @@
 import { useState, useEffect } from 'react'
 import { getAISettings, setAISettings, testConnection } from '../services/ai'
 
+interface MasterBerkasGroup {
+  id: string
+  name: string
+}
+
 interface AISettingsDialogProps {
   open: boolean
   onClose: () => void
+  onOpenMasterBerkas?: () => void
 }
 
-export function AISettingsDialog({ open, onClose }: AISettingsDialogProps) {
+const MASTER_BERKAS_ACTIVE_KEY = 'rps-master-berkas-active-group'
+
+export function AISettingsDialog({ open, onClose, onOpenMasterBerkas }: AISettingsDialogProps) {
   const [provider, setProvider] = useState<'free' | 'custom'>('free')
   const [host, setHost] = useState('')
   const [apiKey, setApiKey] = useState('')
   const [model, setModel] = useState('')
   const [testStatus, setTestStatus] = useState<'idle' | 'loading' | 'ok' | 'error'>('idle')
   const [testMessage, setTestMessage] = useState('')
+  const [groups, setGroups] = useState<MasterBerkasGroup[]>([])
+  const [activeGroupId, setActiveGroupId] = useState<string | null>(null)
 
   useEffect(() => {
     if (open) {
@@ -23,6 +33,16 @@ export function AISettingsDialog({ open, onClose }: AISettingsDialogProps) {
       setModel(s.model)
       setTestStatus('idle')
       setTestMessage('')
+
+      // Load master berkas groups
+      try {
+        const raw = localStorage.getItem('rps-master-berkas-data')
+        if (raw) {
+          const d = JSON.parse(raw)
+          setGroups(d.groups?.map((g: MasterBerkasGroup) => ({ id: g.id, name: g.name })) || [])
+        }
+        setActiveGroupId(localStorage.getItem(MASTER_BERKAS_ACTIVE_KEY))
+      } catch { /* ignore */ }
     }
   }, [open])
 
@@ -117,21 +137,74 @@ export function AISettingsDialog({ open, onClose }: AISettingsDialogProps) {
                 />
               </div>
 
-              <div className="form-group">
-                <label className="form-label">Model</label>
-                <input
-                  type="text"
-                  value={model}
-                  onChange={(e) => setModel(e.target.value)}
-                  className="form-input"
-                  placeholder="gpt-4o"
-                />
-                <p className="form-hint">
-                  GPT-4o, Claude-3.5-sonnet, gemini-pro, llama3, dll
-                </p>
-              </div>
-            </>
-          )}
+          <div className="form-group">
+            <label className="form-label">Model</label>
+            <input
+              type="text"
+              value={model}
+              onChange={(e) => setModel(e.target.value)}
+              className="form-input"
+              placeholder="gpt-4o"
+            />
+            <p className="form-hint">
+              GPT-4o, Claude-3.5-sonnet, gemini-pro, llama3, dll
+            </p>
+          </div>
+        </>
+      )}
+
+      <div className="form-group">
+        <label className="form-label">Gunakan Master Berkas</label>
+        <div className="flex gap-2">
+          <select
+            value={activeGroupId || ''}
+            onChange={(e) => {
+              const id = e.target.value || null
+              setActiveGroupId(id)
+              if (id) {
+                localStorage.setItem(MASTER_BERKAS_ACTIVE_KEY, id)
+              } else {
+                localStorage.removeItem(MASTER_BERKAS_ACTIVE_KEY)
+              }
+              // Sync active group data to localStorage for AI service
+              if (id) {
+                try {
+                  const raw = localStorage.getItem('rps-master-berkas-data')
+                  if (raw) {
+                    const d = JSON.parse(raw)
+                    const group = d.groups?.find((g: MasterBerkasGroup) => g.id === id)
+                    if (group) {
+                      localStorage.setItem('rps-master-berkas-data', JSON.stringify({
+                        groups: [{ id: group.id, name: group.name, documents: group.documents?.map((doc: { id: string; name: string; extractedText: string }) => ({
+                          id: doc.id, name: doc.name, extractedText: doc.extractedText
+                        })) || [] }]
+                      }))
+                    }
+                  }
+                } catch { /* ignore */ }
+              } else {
+                localStorage.removeItem('rps-master-berkas-data')
+              }
+            }}
+            className="form-input flex-1"
+          >
+            <option value="">Tanpa master berkas</option>
+            {groups.map(g => (
+              <option key={g.id} value={g.id}>{g.name}</option>
+            ))}
+          </select>
+          <button
+            type="button"
+            onClick={onOpenMasterBerkas}
+            className="btn btn-secondary text-sm px-3"
+          >
+            Kelola
+          </button>
+        </div>
+        <p className="form-hint">
+          Pilih kelompok master berkas untuk dijadikan konteks AI saat mengisi otomatis
+        </p>
+      </div>
 
           {testStatus !== 'idle' && (
             <div className={`status-msg ${testStatus === 'ok' ? 'status-msg-ok' : testStatus === 'loading' ? 'status-msg-info' : 'status-msg-err'}`}>

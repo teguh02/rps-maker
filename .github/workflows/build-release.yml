@@ -90,6 +90,7 @@ jobs:
     name: Build installer (${{ matrix.label }})
     needs: bump-version
     runs-on: ${{ matrix.os }}
+    continue-on-error: ${{ matrix.optional || false }}
     strategy:
       fail-fast: false
       matrix:
@@ -102,6 +103,7 @@ jobs:
             os: macos-latest
             script: dist:mac
             artifact: rps-maker-mac
+            optional: true
     env:
       # Tanpa sertifikat signing: nonaktifkan auto-discovery (macOS wajib,
       # kalau tidak electron-builder gagal mencari identitas signing).

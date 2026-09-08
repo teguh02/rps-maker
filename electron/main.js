@@ -161,7 +161,12 @@ ipcMain.handle('dialog:save', async (_, data) => {
   }
 
   log.debug('IPC', 'dialog:save_file', { filePath: result.filePath });
-  await writeRpsZip(result.filePath, data.content);
+  try {
+    await writeRpsZip(result.filePath, data.content);
+  } catch (err) {
+    log.error('IPC', 'dialog:save_error', { error: err.message });
+    return null;
+  }
 
   const recent = readRecent().filter(r => r.path !== result.filePath);
   recent.unshift({ path: result.filePath, name: path.basename(result.filePath), openedAt: new Date().toISOString() });
@@ -208,7 +213,12 @@ ipcMain.handle('dialog:save-as', async (_, data) => {
   }, null, 2));
 
   const zipBuffer = await zip.generateAsync({ type: 'nodebuffer' });
-  fs.writeFileSync(result.filePath, zipBuffer);
+  try {
+    fs.writeFileSync(result.filePath, zipBuffer);
+  } catch (err) {
+    log.error('IPC', 'dialog:save-as_error', { error: err.message });
+    return null;
+  }
 
   const recent = readRecent().filter(r => r.path !== result.filePath);
   recent.unshift({ path: result.filePath, name: path.basename(result.filePath), openedAt: new Date().toISOString() });

@@ -58,7 +58,6 @@ type PertemuanRow = PertemuanItem | PertemuanSpecial
 export function Editor({ project, onUpdate, onSave, onExport, onOpenAISettings, onGoHome, onOpenGuide, onPreview, onOpenMasterBerkas, onOpenCustomCommands, autoSaveActive, lastAutoSaveAt, showToast }: EditorProps) {
   const [activeSection, setActiveSection] = useState('identitas')
   const [aiLoading, setAiLoading] = useState(false)
-  const [aiError, setAiError] = useState('')
   const [dismissedGuides, setDismissedGuides] = useState<Set<string>>(new Set())
   const [zoom, setZoom] = useState(1) // 100%
   const [undoStack, setUndoStack] = useState<string[]>([])
@@ -452,7 +451,6 @@ export function Editor({ project, onUpdate, onSave, onExport, onOpenAISettings, 
     }
     logger.info('EDITOR', 'editor.ai_generate_start', { section })
     setAiLoading(true)
-    setAiError('')
     const startTime = Date.now()
     try {
       const opts = getSectionPrompt(section, project.content)
@@ -489,7 +487,6 @@ export function Editor({ project, onUpdate, onSave, onExport, onOpenAISettings, 
     } catch (err) {
       const duration = ((Date.now() - startTime) / 1000).toFixed(1)
       logger.error('EDITOR', 'editor.ai_generate_error', { section, error: (err as Error).message, duration })
-      setAiError((err as Error).message)
       safeToast('Gagal generate AI: ' + (err as Error).message, 'error')
     } finally {
       setAiLoading(false)

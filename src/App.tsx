@@ -303,6 +303,7 @@ function App() {
       loadRecentFiles()
     } else {
       logger.error('APP', 'project.open_error', { filePath })
+      showToast('Gagal membuka proyek. File mungkin sudah dipindah atau rusak.', 'error')
     }
   }
 

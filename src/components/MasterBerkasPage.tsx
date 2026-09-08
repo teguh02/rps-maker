@@ -80,7 +80,7 @@ export function MasterBerkasPage({ onBack, showToast }: MasterBerkasPageProps) {
       // Sync active group to localStorage for AI service
       syncActiveGroupToLocalStorage(d)
     } catch (err) {
-      console.error('Failed to load master berkas:', err)
+      showToast?.('Gagal memuat master berkas.', 'error')
     } finally {
       setLoading(false)
     }

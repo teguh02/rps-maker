@@ -441,12 +441,13 @@ export function Editor({ project, onUpdate, onSave, onExport, onOpenAISettings, 
     logger.info('EDITOR', 'editor.ai_generate_clicked', { section })
     if (!isAIConfigured()) {
       logger.warn('EDITOR', 'editor.ai_not_configured', { section })
-      setAiError('AI belum dikonfigurasi. Buka Settings untuk mengatur.')
+      safeToast('AI belum dikonfigurasi. Buka AI Settings untuk mengatur.', 'error')
       return
     }
     const depError = validateSectionDeps(section)
     if (depError) {
-      setAiError(depError)
+      logger.warn('EDITOR', 'editor.ai_deps_missing', { section, error: depError })
+      safeToast(depError, 'error')
       return
     }
     logger.info('EDITOR', 'editor.ai_generate_start', { section })

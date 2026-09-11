@@ -343,7 +343,7 @@ Aturan:
 8. materiPustaka: judul singkat pustaka + tahun dari Pustaka Utama/Pendukung
 9. bobot: 5 untuk pertemuan reguler, 35 untuk UTS (minggu 8), 35 untuk UAS (minggu 16)
 10. Minggu 8 = UTS, Minggu 16 = UAS
-Kembalikan HANYA JSON array, tanpa penjelasan tambahan.
+PENTING: Kembalikan HANYA JSON array murni. Jangan bungkus dalam code block markdown. Jangan sertakan penjelasan atau teks apapun di luar JSON.
 
 Contoh format yang benar (berdasarkan RPS Farmakognosi UNISINA):
 [

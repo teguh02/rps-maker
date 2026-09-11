@@ -1135,7 +1135,7 @@ export function Editor({ project, onUpdate, onSave, onExport, onOpenAISettings, 
             </div>
             <div style={{ padding: '20px 24px', flex: 1, overflowY: 'auto' }}>
               <p style={{ fontSize: '12px', color: '#6b7280', marginBottom: 12 }}>
-                Tulis perintah custom yang akan ditambahkan ke instruksi utama AI saat generate semua section.
+                Tulis perintah custom yang akan ditambahkan ke instruksi utama AI saat generate semua section. Perintah ini akan disisipkan di akhir system prompt untuk semua section AI.
               </p>
               <textarea
                 style={{ width: '100%', border: '1px solid #d1d5db', borderRadius: 6, padding: '10px 12px', fontSize: '13px', color: '#1f2937', resize: 'none', outline: 'none', minHeight: 120, fontFamily: 'inherit' }}
@@ -1144,9 +1144,6 @@ export function Editor({ project, onUpdate, onSave, onExport, onOpenAISettings, 
                 value={customCommandText}
                 onChange={(e) => setCustomCommandText(e.target.value)}
               />
-              <p style={{ fontSize: '11px', color: '#9ca3af', marginTop: 8 }}>
-                Perintah ini akan disisipkan di akhir system prompt untuk semua section AI.
-              </p>
             </div>
             <div style={{ padding: '12px 24px', borderTop: '1px solid #e5e7eb', display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: 8 }}>
               <button

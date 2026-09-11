@@ -310,14 +310,20 @@ export function Editor({ project, onUpdate, onSave, onExport, onOpenAISettings, 
 
   const getPertemuan = (): PertemuanRow[] => {
     try {
-      return JSON.parse(project.content.pertemuan || '[]')
-    } catch {
+      const raw = project.content.pertemuan || '[]'
+      const parsed = JSON.parse(raw)
+      logger.debug('EDITOR', 'editor.getPertemuan', { rawLength: raw.length, isArray: Array.isArray(parsed), count: Array.isArray(parsed) ? parsed.length : 'N/A' })
+      return parsed
+    } catch (err) {
+      logger.warn('EDITOR', 'editor.getPertemuan_parse_error', { error: (err as Error).message })
       return []
     }
   }
 
   const updatePertemuan = (items: PertemuanRow[]) => {
-    updateField('pertemuan', JSON.stringify(items))
+    const json = JSON.stringify(items)
+    logger.debug('EDITOR', 'editor.updatePertemuan', { itemCount: items.length, jsonLength: json.length })
+    updateField('pertemuan', json)
   }
 
   const updatePertemuanField = (idx: number, field: keyof PertemuanItem, value: string | number) => {
@@ -476,8 +482,12 @@ export function Editor({ project, onUpdate, onSave, onExport, onOpenAISettings, 
         }
       // Pertemuan needs JSON parsing + UTS/UAS markers
       } else if (section === 'pertemuan') {
+        logger.debug('EDITOR', 'editor.ai_pertemuan_start', { rawLength: result.length })
+        const cleaned = cleanAiJson(result)
+        logger.debug('EDITOR', 'editor.ai_pertemuan_cleaned', { cleanedLength: cleaned.length, preview: cleaned.substring(0, 200) })
         try {
-          const parsed = JSON.parse(cleanAiJson(result))
+          const parsed = JSON.parse(cleaned)
+          logger.debug('EDITOR', 'editor.ai_pertemuan_parsed', { isArray: Array.isArray(parsed), count: Array.isArray(parsed) ? parsed.length : 'N/A' })
           if (Array.isArray(parsed)) {
             const items: PertemuanRow[] = []
             for (let i = 0; i < parsed.length; i++) {
@@ -500,46 +510,16 @@ export function Editor({ project, onUpdate, onSave, onExport, onOpenAISettings, 
                 bobot: row.bobot || 5,
               })
             }
+            logger.debug('EDITOR', 'editor.ai_pertemuan_built', { itemCount: items.length })
             updatePertemuan(items)
+            logger.info('EDITOR', 'editor.ai_pertemuan_saved', { itemCount: items.length })
           } else {
+            logger.warn('EDITOR', 'editor.ai_pertemuan_not_array', { type: typeof parsed })
             updateField(section, result)
           }
-        } catch {
-          logger.warn('EDITOR', 'editor.ai_invalid_json', { section })
+        } catch (parseErr) {
+          logger.error('EDITOR', 'editor.ai_pertemuan_parse_error', { error: (parseErr as Error).message, preview: cleaned.substring(0, 300) })
           safeToast('AI mengembalikan format tidak valid. Coba generate ulang.', 'error')
-        }
-      // Pertemuan needs JSON parsing + UTS/UAS markers
-      } else if (section === 'pertemuan') {
-        try {
-          const parsed = JSON.parse(result)
-          if (Array.isArray(parsed)) {
-            const items: PertemuanRow[] = []
-            for (let i = 0; i < parsed.length; i++) {
-              const row = parsed[i]
-              if (row.no === 8) {
-                items.push({ type: 'uts', no: 0, label: 'Evaluasi Tengah Semester (UTS)' })
-              }
-              if (row.no === 16) {
-                items.push({ type: 'uas', no: 0, label: 'Evaluasi Akhir Semester (UAS)' })
-              }
-              items.push({
-                no: row.no || i + 1,
-                subCpmk: row.subCpmk || '',
-                indikator: row.indikator || '',
-                kriteriaTeknik: row.kriteriaTeknik || '',
-                bentukMetodePenugasan: row.bentukMetodePenugasan || '',
-                luring: row.luring || '',
-                daring: row.daring || '',
-                materiPustaka: row.materiPustaka || '',
-                bobot: row.bobot || 5,
-              })
-            }
-            updatePertemuan(items)
-          } else {
-            updateField(section, result)
-          }
-        } catch {
-          updateField(section, result)
         }
       // Pustaka has two fields
       } else if (section === 'pustaka') {

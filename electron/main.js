@@ -363,7 +363,7 @@ ipcMain.handle('ai:generate', async (_, { apiHost, apiKey, model, systemPrompt, 
       { role: 'user', content: userPrompt },
     ],
     temperature: 0.7,
-    max_tokens: 4000,
+    max_tokens: 16384,
     stream: false,
   };
 

@@ -23,6 +23,7 @@ interface MasterBerkasData {
 
 interface MasterBerkasPageProps {
   onBack: () => void
+  showToast?: (message: string, type?: 'info' | 'warning' | 'error') => void
 }
 
 const MAX_DOCS_PER_GROUP = 6
@@ -47,7 +48,7 @@ function getFileTypeLabel(type: string): string {
   return labels[type] || type.toUpperCase()
 }
 
-export function MasterBerkasPage({ onBack }: MasterBerkasPageProps) {
+export function MasterBerkasPage({ onBack, showToast }: MasterBerkasPageProps) {
   const [data, setData] = useState<MasterBerkasData>({ groups: [], activeGroupId: null })
   const [selectedGroupId, setSelectedGroupId] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
@@ -79,7 +80,7 @@ export function MasterBerkasPage({ onBack }: MasterBerkasPageProps) {
       // Sync active group to localStorage for AI service
       syncActiveGroupToLocalStorage(d)
     } catch (err) {
-      console.error('Failed to load master berkas:', err)
+      showToast?.('Gagal memuat master berkas.', 'error')
     } finally {
       setLoading(false)
     }
@@ -156,7 +157,7 @@ export function MasterBerkasPage({ onBack }: MasterBerkasPageProps) {
     if (!file) return
     const ext = '.' + file.name.split('.').pop()?.toLowerCase()
     if (!['.pdf', '.docx', '.xlsx', '.csv'].includes(ext)) {
-      alert('Format file tidak didukung. Gunakan PDF, Word, Excel, atau CSV.')
+      showToast?.('Format file tidak didukung. Gunakan PDF, Word, Excel, atau CSV.', 'error')
       return
     }
     setPendingFile({ file, name: file.name.replace(/\.[^.]+$/, '') })
@@ -173,7 +174,7 @@ export function MasterBerkasPage({ onBack }: MasterBerkasPageProps) {
         fileName: pendingFile.file.name,
       })
       if (!result.ok) {
-        alert('Gagal mengekstrak file: ' + result.error)
+        showToast?.('Gagal mengekstrak file: ' + result.error, 'error')
         return
       }
       const doc: MasterBerkasDocument = {
@@ -195,7 +196,7 @@ export function MasterBerkasPage({ onBack }: MasterBerkasPageProps) {
       await saveData(newData)
       setPendingFile(null)
     } catch (err) {
-      alert('Gagal upload: ' + (err as Error).message)
+      showToast?.('Gagal upload: ' + (err as Error).message, 'error')
     } finally {
       setUploading(false)
     }

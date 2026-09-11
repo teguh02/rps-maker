@@ -161,7 +161,12 @@ ipcMain.handle('dialog:save', async (_, data) => {
   }
 
   log.debug('IPC', 'dialog:save_file', { filePath: result.filePath });
-  await writeRpsZip(result.filePath, data.content);
+  try {
+    await writeRpsZip(result.filePath, data.content);
+  } catch (err) {
+    log.error('IPC', 'dialog:save_error', { error: err.message });
+    return null;
+  }
 
   const recent = readRecent().filter(r => r.path !== result.filePath);
   recent.unshift({ path: result.filePath, name: path.basename(result.filePath), openedAt: new Date().toISOString() });
@@ -208,7 +213,12 @@ ipcMain.handle('dialog:save-as', async (_, data) => {
   }, null, 2));
 
   const zipBuffer = await zip.generateAsync({ type: 'nodebuffer' });
-  fs.writeFileSync(result.filePath, zipBuffer);
+  try {
+    fs.writeFileSync(result.filePath, zipBuffer);
+  } catch (err) {
+    log.error('IPC', 'dialog:save-as_error', { error: err.message });
+    return null;
+  }
 
   const recent = readRecent().filter(r => r.path !== result.filePath);
   recent.unshift({ path: result.filePath, name: path.basename(result.filePath), openedAt: new Date().toISOString() });
@@ -354,6 +364,7 @@ ipcMain.handle('ai:generate', async (_, { apiHost, apiKey, model, systemPrompt, 
     ],
     temperature: 0.7,
     max_tokens: 4000,
+    stream: false,
   };
 
   // Enable OpenRouter web search plugin so the AI can pull up-to-date references
@@ -387,29 +398,52 @@ ipcMain.handle('ai:generate', async (_, { apiHost, apiKey, model, systemPrompt, 
     try {
       data = JSON.parse(text);
     } catch (parseErr) {
-      // Try to find valid JSON by finding matching braces
-      const firstBrace = text.indexOf('{');
-      if (firstBrace >= 0) {
-        let depth = 0;
-        let endPos = firstBrace;
-        for (let i = firstBrace; i < text.length; i++) {
-          if (text[i] === '{') depth++;
-          else if (text[i] === '}') depth--;
-          if (depth === 0) {
-            endPos = i + 1;
-            break;
-          }
+      // Some APIs return SSE streaming format even with stream:false.
+      // Detect "data: {...}" lines and extract content deltas.
+      if (text.trimStart().startsWith('data:')) {
+        log.debug('IPC', 'ai:generate_sse_detected');
+        const lines = text.split('\n');
+        let collected = '';
+        for (const line of lines) {
+          const trimmed = line.trim();
+          if (!trimmed || trimmed === 'data: [DONE]') continue;
+          if (!trimmed.startsWith('data: ')) continue;
+          try {
+            const chunk = JSON.parse(trimmed.slice(6));
+            const delta = chunk.choices?.[0]?.delta?.content;
+            if (delta) collected += delta;
+          } catch { /* skip unparseable chunks */ }
         }
-        try {
-          data = JSON.parse(text.substring(firstBrace, endPos));
-          log.debug('IPC', 'ai:generate_extracted_json', { extracted: true });
-        } catch {
+        if (collected) {
+          data = { choices: [{ message: { content: collected } }] };
+          log.debug('IPC', 'ai:generate_sse_reassembled', { length: collected.length });
+        }
+      }
+      if (!data) {
+        // Fallback: try to find valid JSON by finding matching braces
+        const firstBrace = text.indexOf('{');
+        if (firstBrace >= 0) {
+          let depth = 0;
+          let endPos = firstBrace;
+          for (let i = firstBrace; i < text.length; i++) {
+            if (text[i] === '{') depth++;
+            else if (text[i] === '}') depth--;
+            if (depth === 0) {
+              endPos = i + 1;
+              break;
+            }
+          }
+          try {
+            data = JSON.parse(text.substring(firstBrace, endPos));
+            log.debug('IPC', 'ai:generate_extracted_json', { extracted: true });
+          } catch {
+            log.error('IPC', 'ai:generate_parse_error', { error: parseErr.message, preview: text.substring(0, 500) });
+            return { ok: false, error: `Invalid response format` };
+          }
+        } else {
           log.error('IPC', 'ai:generate_parse_error', { error: parseErr.message, preview: text.substring(0, 500) });
           return { ok: false, error: `Invalid response format` };
         }
-      } else {
-        log.error('IPC', 'ai:generate_parse_error', { error: parseErr.message, preview: text.substring(0, 500) });
-        return { ok: false, error: `Invalid response format` };
       }
     }
     

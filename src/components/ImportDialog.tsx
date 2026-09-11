@@ -4,9 +4,10 @@ interface ImportDialogProps {
   open: boolean
   onClose: () => void
   onImport: (data: Record<string, string>) => void
+  showToast?: (message: string, type?: 'info' | 'warning' | 'error') => void
 }
 
-export function ImportDialog({ open, onClose, onImport }: ImportDialogProps) {
+export function ImportDialog({ open, onClose, onImport, showToast }: ImportDialogProps) {
   const [step, setStep] = useState<'upload' | 'mapping' | 'done'>('upload')
   const [rawData, setRawData] = useState<string[][]>([])
   const [headers, setHeaders] = useState<string[]>([])
@@ -18,16 +19,28 @@ export function ImportDialog({ open, onClose, onImport }: ImportDialogProps) {
     const reader = new FileReader()
     reader.onload = (evt) => {
       const text = evt.target?.result as string
+      if (!text || !text.trim()) {
+        showToast?.('File kosong atau tidak bisa dibaca.', 'error')
+        return
+      }
       const lines = text.split('\n').filter(l => l.trim())
       const rows = lines.map(line => {
-        // Simple CSV parser
         return line.split(',').map(cell => cell.trim().replace(/^"|"$/g, ''))
       })
-      if (rows.length > 0) {
-        setHeaders(rows[0])
-        setRawData(rows.slice(1))
-        setStep('mapping')
+      if (rows.length === 0) {
+        showToast?.('Tidak ada data ditemukan di file.', 'error')
+        return
       }
+      if (rows.length < 2) {
+        showToast?.('File harus memiliki minimal 2 baris (header + 1 data).', 'warning')
+        return
+      }
+      setHeaders(rows[0])
+      setRawData(rows.slice(1))
+      setStep('mapping')
+    }
+    reader.onerror = () => {
+      showToast?.('Gagal membaca file. Periksa format file.', 'error')
     }
     reader.readAsText(file)
   }

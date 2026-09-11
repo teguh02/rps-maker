@@ -49,7 +49,7 @@ const tabs: { id: TabId; label: string }[] = [
   { id: 'help', label: 'Help' },
 ]
 
-const AI_SUPPORTED_SECTIONS = ['cpl', 'cpmk', 'sub_cpmk', 'deskripsi_mk', 'bahan_kajian', 'penilaian', 'pustaka']
+const AI_SUPPORTED_SECTIONS = ['cpl', 'cpmk', 'sub_cpmk', 'deskripsi_mk', 'bahan_kajian', 'penilaian', 'pustaka', 'pertemuan']
 
 const FONT_FAMILIES = [
   'Times New Roman',
@@ -70,7 +70,7 @@ export function Ribbon({
   onSave, onExport, onOpenAISettings, onGoHome, activeSection, onGenerateAI, aiLoading,
   onCut, onCopy, onPaste, onUndo, onRedo, canUndo, canRedo,
   onZoomIn, onZoomOut, onZoomReset, onPreview, isFullscreen, onToggleFullscreen, onShowShortcuts, onShowAbout,
-  onOpenMasterBerkas,
+  onOpenMasterBerkas, onOpenCustomCommands,
 }: RibbonProps) {
   const [activeTab, setActiveTab] = useState<TabId>('home')
   const [showContent, setShowContent] = useState(true)

@@ -58,7 +58,6 @@ type PertemuanRow = PertemuanItem | PertemuanSpecial
 export function Editor({ project, onUpdate, onSave, onExport, onOpenAISettings, onGoHome, onOpenGuide, onPreview, onOpenMasterBerkas, onOpenCustomCommands, autoSaveActive, lastAutoSaveAt, showToast }: EditorProps) {
   const [activeSection, setActiveSection] = useState('identitas')
   const [aiLoading, setAiLoading] = useState(false)
-  const [aiError, setAiError] = useState('')
   const [dismissedGuides, setDismissedGuides] = useState<Set<string>>(new Set())
   const [zoom, setZoom] = useState(1) // 100%
   const [undoStack, setUndoStack] = useState<string[]>([])
@@ -415,7 +414,7 @@ export function Editor({ project, onUpdate, onSave, onExport, onOpenAISettings, 
     bahan_kajian: '💡 Tuliskan bahan kajian utama yang harus dikuasai mahasiswa.',
     penilaian: '💡 Format penilaian fleksibel. Bobot total harus 100%. IKU 7: minimal 50% asesmen partisipatif.',
     pustaka: '💡 Pustaka utama minimal 2 buku. Referensi harus terkini (max 5 tahun terakhir).',
-    pertemuan: '💡 Klik "Generate dari Sub-CPMK" untuk mengisi otomatis, lalu lengkapi kolom lainnya.',
+      pertemuan: '💡 Klik "Generate AI" untuk isi semua kolom otomatis (mengambil dari CPL, CPMK, Sub-CPMK, Bahan Kajian, Pustaka). Atau klik "Generate dari Sub-CPMK" untuk isi kolom Sub-CPMK saja.',
     ttd: '💡 Tanda tangan pengesahan RPS. Isi otomatis dari data Identitas Dosen (Profil).',
   }
 
@@ -429,6 +428,10 @@ export function Editor({ project, onUpdate, onSave, onExport, onOpenAISettings, 
       bahan_kajian: [{ label: 'CPMK', check: () => !!c.cpmk }],
       penilaian: [{ label: 'CPMK', check: () => !!c.cpmk }],
       pustaka: [{ label: 'Mata Kuliah', check: () => !!c.mata_kuliah }],
+      pertemuan: [
+        { label: 'Sub-CPMK', check: () => { try { return JSON.parse(c.sub_cpmk || '[]').length > 0 } catch { return false } } },
+        { label: 'Bahan Kajian', check: () => { try { return JSON.parse(c.bahan_kajian || '[]').length > 0 } catch { return false } } },
+      ],
     }
     const missing = deps[section]?.filter(d => !d.check()).map(d => d.label)
     if (missing && missing.length > 0) {
@@ -441,17 +444,17 @@ export function Editor({ project, onUpdate, onSave, onExport, onOpenAISettings, 
     logger.info('EDITOR', 'editor.ai_generate_clicked', { section })
     if (!isAIConfigured()) {
       logger.warn('EDITOR', 'editor.ai_not_configured', { section })
-      setAiError('AI belum dikonfigurasi. Buka Settings untuk mengatur.')
+      safeToast('AI belum dikonfigurasi. Buka AI Settings untuk mengatur.', 'error')
       return
     }
     const depError = validateSectionDeps(section)
     if (depError) {
-      setAiError(depError)
+      logger.warn('EDITOR', 'editor.ai_deps_missing', { section, error: depError })
+      safeToast(depError, 'error')
       return
     }
     logger.info('EDITOR', 'editor.ai_generate_start', { section })
     setAiLoading(true)
-    setAiError('')
     const startTime = Date.now()
     try {
       const opts = getSectionPrompt(section, project.content)
@@ -463,6 +466,39 @@ export function Editor({ project, onUpdate, onSave, onExport, onOpenAISettings, 
           const parsed = JSON.parse(result)
           if (Array.isArray(parsed)) {
             updatePenilaian(parsed)
+          } else {
+            updateField(section, result)
+          }
+        } catch {
+          updateField(section, result)
+        }
+      // Pertemuan needs JSON parsing + UTS/UAS markers
+      } else if (section === 'pertemuan') {
+        try {
+          const parsed = JSON.parse(result)
+          if (Array.isArray(parsed)) {
+            const items: PertemuanRow[] = []
+            for (let i = 0; i < parsed.length; i++) {
+              const row = parsed[i]
+              if (row.no === 8) {
+                items.push({ type: 'uts', no: 0, label: 'Evaluasi Tengah Semester (UTS)' })
+              }
+              if (row.no === 16) {
+                items.push({ type: 'uas', no: 0, label: 'Evaluasi Akhir Semester (UAS)' })
+              }
+              items.push({
+                no: row.no || i + 1,
+                subCpmk: row.subCpmk || '',
+                indikator: row.indikator || '',
+                kriteriaTeknik: row.kriteriaTeknik || '',
+                bentukMetodePenugasan: row.bentukMetodePenugasan || '',
+                luring: row.luring || '',
+                daring: row.daring || '',
+                materiPustaka: row.materiPustaka || '',
+                bobot: row.bobot || 5,
+              })
+            }
+            updatePertemuan(items)
           } else {
             updateField(section, result)
           }
@@ -488,7 +524,6 @@ export function Editor({ project, onUpdate, onSave, onExport, onOpenAISettings, 
     } catch (err) {
       const duration = ((Date.now() - startTime) / 1000).toFixed(1)
       logger.error('EDITOR', 'editor.ai_generate_error', { section, error: (err as Error).message, duration })
-      setAiError((err as Error).message)
       safeToast('Gagal generate AI: ' + (err as Error).message, 'error')
     } finally {
       setAiLoading(false)
@@ -1091,37 +1126,34 @@ export function Editor({ project, onUpdate, onSave, onExport, onOpenAISettings, 
       {/* Custom AI Command Dialog */}
       {showCustomCommandDialog && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40" onClick={() => setShowCustomCommandDialog(false)}>
-          <div className="bg-white rounded-lg shadow-xl w-[520px] max-h-[80vh] flex flex-col" onClick={(e) => e.stopPropagation()}>
-            <div className="flex items-center justify-between px-5 py-3 border-b border-gray-200">
-              <h3 className="text-sm font-semibold text-gray-800">Custom Commands</h3>
-              <button className="text-gray-400 hover:text-gray-600" onClick={() => setShowCustomCommandDialog(false)}>
+          <div className="bg-white rounded-lg shadow-xl w-[520px] max-h-[80vh] flex flex-col" style={{ padding: 0 }} onClick={(e) => e.stopPropagation()}>
+            <div style={{ padding: '16px 24px', borderBottom: '1px solid #e5e7eb', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+              <h3 style={{ fontSize: '14px', fontWeight: 600, color: '#1f2937', margin: 0 }}>Custom Commands</h3>
+              <button style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#9ca3af', padding: 4 }} onClick={() => setShowCustomCommandDialog(false)}>
                 <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
               </button>
             </div>
-            <div className="px-5 py-4 flex-1 overflow-y-auto">
-              <p className="text-xs text-gray-500 mb-3">
-                Tulis perintah custom yang akan ditambahkan ke instruksi utama AI saat generate semua section.
+            <div style={{ padding: '20px 24px', flex: 1, overflowY: 'auto' }}>
+              <p style={{ fontSize: '12px', color: '#6b7280', marginBottom: 12 }}>
+                Tulis perintah custom yang akan ditambahkan ke instruksi utama AI saat generate semua section. Perintah ini akan disisipkan di akhir system prompt untuk semua section AI.
               </p>
               <textarea
-                className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm text-gray-800 resize-none focus:outline-none focus:border-blue-400 focus:ring-1 focus:ring-blue-400"
+                style={{ width: '100%', border: '1px solid #d1d5db', borderRadius: 6, padding: '10px 12px', fontSize: '13px', color: '#1f2937', resize: 'none', outline: 'none', minHeight: 120, fontFamily: 'inherit' }}
                 rows={5}
                 placeholder={'Contoh: Gunakan bahasa formal akademik, sertakan referensi kurikulum 2025, hindari istilah asing tanpa penjelasan...'}
                 value={customCommandText}
                 onChange={(e) => setCustomCommandText(e.target.value)}
               />
-              <p className="text-[11px] text-gray-400 mt-2">
-                Perintah ini akan disisipkan di akhir system prompt untuk semua section AI.
-              </p>
             </div>
-            <div className="flex items-center justify-end gap-2 px-5 py-3 border-t border-gray-200">
+            <div style={{ padding: '12px 24px', borderTop: '1px solid #e5e7eb', display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: 8 }}>
               <button
-                className="px-4 py-1.5 text-xs font-medium text-gray-600 border border-gray-300 rounded-md hover:bg-gray-50"
+                style={{ padding: '6px 16px', fontSize: '12px', fontWeight: 500, color: '#4b5563', border: '1px solid #d1d5db', borderRadius: 6, background: 'white', cursor: 'pointer' }}
                 onClick={() => setShowCustomCommandDialog(false)}
               >
                 Batal
               </button>
               <button
-                className="px-4 py-1.5 text-xs font-medium text-white bg-blue-600 rounded-md hover:bg-blue-700"
+                style={{ padding: '6px 16px', fontSize: '12px', fontWeight: 500, color: 'white', background: '#2563eb', borderRadius: 6, border: 'none', cursor: 'pointer' }}
                 onClick={handleSaveCustomCommand}
               >
                 Simpan

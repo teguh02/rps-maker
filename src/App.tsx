@@ -303,6 +303,7 @@ function App() {
       loadRecentFiles()
     } else {
       logger.error('APP', 'project.open_error', { filePath })
+      showToast('Gagal membuka proyek. File mungkin sudah dipindah atau rusak.', 'error')
     }
   }
 
@@ -429,7 +430,7 @@ function App() {
   // Full-page master berkas (AI ribbon → Master Berkas)
   if (showMasterBerkas) {
     return (
-      <MasterBerkasPage onBack={() => setShowMasterBerkas(false)} />
+      <MasterBerkasPage onBack={() => setShowMasterBerkas(false)} showToast={showToast} />
     )
   }
 
@@ -467,7 +468,7 @@ function App() {
           setShowMasterBerkas(true)
         }}
       />
-      <ImportDialog open={showImport} onClose={() => setShowImport(false)} onImport={(data) => {
+      <ImportDialog open={showImport} onClose={() => setShowImport(false)} showToast={showToast} onImport={(data) => {
         logger.info('APP', 'project.import_data', { fields: Object.keys(data) })
         if (project) {
           setProject({ ...project, content: { ...project.content, ...data } })

@@ -11,6 +11,7 @@ import type { StructuredItem } from './StructuredList'
 import { isAIConfigured, generateWithAI, getSectionPrompt } from '../services/ai'
 import { logger } from '../utils/logger'
 import { stripHtml } from '../utils/html'
+import { cleanAiJson } from '../utils/json'
 
 interface EditorProps {
   project: Project
@@ -463,19 +464,20 @@ export function Editor({ project, onUpdate, onSave, onExport, onOpenAISettings, 
       // Penilaian needs JSON parsing
       if (section === 'penilaian') {
         try {
-          const parsed = JSON.parse(result)
+          const parsed = JSON.parse(cleanAiJson(result))
           if (Array.isArray(parsed)) {
             updatePenilaian(parsed)
           } else {
             updateField(section, result)
           }
         } catch {
-          updateField(section, result)
+          logger.warn('EDITOR', 'editor.ai_invalid_json', { section })
+          safeToast('AI mengembalikan format tidak valid. Coba generate ulang.', 'error')
         }
       // Pertemuan needs JSON parsing + UTS/UAS markers
       } else if (section === 'pertemuan') {
         try {
-          const parsed = JSON.parse(result)
+          const parsed = JSON.parse(cleanAiJson(result))
           if (Array.isArray(parsed)) {
             const items: PertemuanRow[] = []
             for (let i = 0; i < parsed.length; i++) {
@@ -503,16 +505,18 @@ export function Editor({ project, onUpdate, onSave, onExport, onOpenAISettings, 
             updateField(section, result)
           }
         } catch {
-          updateField(section, result)
+          logger.warn('EDITOR', 'editor.ai_invalid_json', { section })
+          safeToast('AI mengembalikan format tidak valid. Coba generate ulang.', 'error')
         }
       // Pustaka has two fields
       } else if (section === 'pustaka') {
         try {
-          const parsed = JSON.parse(result)
+          const parsed = JSON.parse(cleanAiJson(result))
           if (parsed.pustaka_utama) updateField('pustaka_utama', parsed.pustaka_utama)
           if (parsed.pustaka_pendukung) updateField('pustaka_pendukung', parsed.pustaka_pendukung)
         } catch {
-          updateField('pustaka_utama', result)
+          logger.warn('EDITOR', 'editor.ai_invalid_json', { section })
+          safeToast('AI mengembalikan format tidak valid. Coba generate ulang.', 'error')
         }
       } else {
         updateField(section, result)

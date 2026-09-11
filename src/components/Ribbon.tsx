@@ -49,7 +49,7 @@ const tabs: { id: TabId; label: string }[] = [
   { id: 'help', label: 'Help' },
 ]
 
-const AI_SUPPORTED_SECTIONS = ['cpl', 'cpmk', 'sub_cpmk', 'deskripsi_mk', 'bahan_kajian', 'penilaian', 'pustaka']
+const AI_SUPPORTED_SECTIONS = ['cpl', 'cpmk', 'sub_cpmk', 'deskripsi_mk', 'bahan_kajian', 'penilaian', 'pustaka', 'pertemuan']
 
 const FONT_FAMILIES = [
   'Times New Roman',

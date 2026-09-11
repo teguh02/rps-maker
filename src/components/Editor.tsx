@@ -414,7 +414,7 @@ export function Editor({ project, onUpdate, onSave, onExport, onOpenAISettings, 
     bahan_kajian: '💡 Tuliskan bahan kajian utama yang harus dikuasai mahasiswa.',
     penilaian: '💡 Format penilaian fleksibel. Bobot total harus 100%. IKU 7: minimal 50% asesmen partisipatif.',
     pustaka: '💡 Pustaka utama minimal 2 buku. Referensi harus terkini (max 5 tahun terakhir).',
-    pertemuan: '💡 Klik "Generate dari Sub-CPMK" untuk mengisi otomatis, lalu lengkapi kolom lainnya.',
+      pertemuan: '💡 Klik "Generate AI" untuk isi semua kolom otomatis (mengambil dari CPL, CPMK, Sub-CPMK, Bahan Kajian, Pustaka). Atau klik "Generate dari Sub-CPMK" untuk isi kolom Sub-CPMK saja.',
     ttd: '💡 Tanda tangan pengesahan RPS. Isi otomatis dari data Identitas Dosen (Profil).',
   }
 
@@ -428,6 +428,10 @@ export function Editor({ project, onUpdate, onSave, onExport, onOpenAISettings, 
       bahan_kajian: [{ label: 'CPMK', check: () => !!c.cpmk }],
       penilaian: [{ label: 'CPMK', check: () => !!c.cpmk }],
       pustaka: [{ label: 'Mata Kuliah', check: () => !!c.mata_kuliah }],
+      pertemuan: [
+        { label: 'Sub-CPMK', check: () => { try { return JSON.parse(c.sub_cpmk || '[]').length > 0 } catch { return false } } },
+        { label: 'Bahan Kajian', check: () => { try { return JSON.parse(c.bahan_kajian || '[]').length > 0 } catch { return false } } },
+      ],
     }
     const missing = deps[section]?.filter(d => !d.check()).map(d => d.label)
     if (missing && missing.length > 0) {
@@ -462,6 +466,39 @@ export function Editor({ project, onUpdate, onSave, onExport, onOpenAISettings, 
           const parsed = JSON.parse(result)
           if (Array.isArray(parsed)) {
             updatePenilaian(parsed)
+          } else {
+            updateField(section, result)
+          }
+        } catch {
+          updateField(section, result)
+        }
+      // Pertemuan needs JSON parsing + UTS/UAS markers
+      } else if (section === 'pertemuan') {
+        try {
+          const parsed = JSON.parse(result)
+          if (Array.isArray(parsed)) {
+            const items: PertemuanRow[] = []
+            for (let i = 0; i < parsed.length; i++) {
+              const row = parsed[i]
+              if (row.no === 8) {
+                items.push({ type: 'uts', no: 0, label: 'Evaluasi Tengah Semester (UTS)' })
+              }
+              if (row.no === 16) {
+                items.push({ type: 'uas', no: 0, label: 'Evaluasi Akhir Semester (UAS)' })
+              }
+              items.push({
+                no: row.no || i + 1,
+                subCpmk: row.subCpmk || '',
+                indikator: row.indikator || '',
+                kriteriaTeknik: row.kriteriaTeknik || '',
+                bentukMetodePenugasan: row.bentukMetodePenugasan || '',
+                luring: row.luring || '',
+                daring: row.daring || '',
+                materiPustaka: row.materiPustaka || '',
+                bobot: row.bobot || 5,
+              })
+            }
+            updatePertemuan(items)
           } else {
             updateField(section, result)
           }

@@ -313,6 +313,64 @@ Kembalikan HANYA JSON, tanpa penjelasan tambahan.
 Contoh format pustaka yang benar (gaya APA 7th edition):
 {"pustaka_utama":"DiPiro, J. T., Yee, G. C., Posey, L. M., Haines, S. T., Nolin, T. D., & Ellingrod, V. (2023). Pharmacotherapy: A Pathophysiologic Approach (12th ed.). New York: McGraw-Hill Education.\nBrunton, L. L., Hilal-Dandan, R., & Knollmann, B. C. (2023). Goodman & Gilman's The Pharmacological Basis of Therapeutics (14th ed.). New York: McGraw-Hill Education.","pustaka_pendukung":"Katzung, B. G., & Trevor, A. J. (2021). Basic & Clinical Pharmacology (15th ed.). New York: McGraw-Hill Education.\nKementerian Kesehatan Republik Indonesia. (2019). Pedoman Nasional Pelayanan Kedokteran Diabetes Melitus Tipe 2. Jakarta: Kementerian Kesehatan RI."}`,
       }
+    case 'pertemuan':
+      return {
+        section,
+        systemPrompt: base + `\n\nAnda harus mengembalikan JSON array dengan format: [{"no":1,"subCpmk":"...","indikator":"...","kriteriaTeknik":"...","bentukMetodePenugasan":"...","luring":"...","daring":"...","materiPustaka":"...","bobot":5}]`,
+        userPrompt: `Generate 16 baris jadwal pertemuan RPS untuk mata kuliah "${plain('mata_kuliah')}"
+
+Sub-CPMK:
+${list('sub_cpmk') || 'Belum diisi'}
+
+Bahan Kajian:
+${list('bahan_kajian') || 'Belum diisi'}
+
+Pustaka Utama:
+${plain('pustaka_utama') || 'Belum diisi'}
+
+Pustaka Pendukung:
+${plain('pustaka_pendukung') || 'Belum diisi'}
+${mb.hasContext ? `\nDokumen referensi tersedia: ${mb.docNames.join(', ')}. Gunakan struktur jadwal pertemuan dari dokumen referensi sebagai panduan utama. Sesuaikan Sub-CPMK, indikator, dan pustaka dengan isi dokumen.` : ''}
+
+Aturan:
+1. Setiap baris = 1 pertemuan (minggu 1-16)
+2. Mapping Sub-CPMK ke pertemuan secara berurutan (beberapa Sub-CPMK bisa 1 pertemuan, beberapa Sub-CPMK bisa multi-pertemuan)
+3. Indikator harus spesifik dan terukur (Taksonomi Bloom)
+4. kriteriaTeknik format: "Kriteria: ...\\nTeknik: ..."
+5. bentukMetodePenugasan format: "Bentuk: ...\\nMetode: ...\\nPenugasan: ..."
+6. luring: metode luring (contoh: "BP: Kuliah, tatap muka")
+7. daring: platform/aktivitas daring (contoh: "E-campus")
+8. materiPustaka: judul singkat pustaka + tahun dari Pustaka Utama/Pendukung
+9. bobot: 5 untuk pertemuan reguler, 35 untuk UTS (minggu 8), 35 untuk UAS (minggu 16)
+10. Minggu 8 = UTS, Minggu 16 = UAS
+Kembalikan HANYA JSON array, tanpa penjelasan tambahan.
+
+Contoh format yang benar (berdasarkan RPS Farmakognosi UNISINA):
+[
+  {
+    "no": 1,
+    "subCpmk": "Mahasiswa mampu menjelaskan pengertian dan ruang lingkup farmakognosi modern",
+    "indikator": "Memahami dan menjelaskan konsep dasar farmakognosi, ruang lingkup, dan kontribusinya dalam riset kefarmasian",
+    "kriteriaTeknik": "Kriteria: ketepatan pemahaman konsep dasar farmakognosi.\\nTeknik: tes diagnostik + penilaian tugas ringkas.",
+    "bentukMetodePenugasan": "Bentuk: Kuliah interaktif\\nMetode: Case-based learning\\nPenugasan: Resume analisis artikel.",
+    "luring": "BP: Kuliah, tatap muka",
+    "daring": "E-campus",
+    "materiPustaka": "Ruang lingkup farmakognosi modern dan kontribusinya dalam riset kefarmasian. Pustaka: Trease & Evans Pharmacognosy; Farmakope Herbal Indonesia (FHI) Edisi II.",
+    "bobot": 5
+  },
+  {
+    "no": 2,
+    "subCpmk": "Mahasiswa mampu mengidentifikasi sumber bahan alam berdasarkan aspek taksonomi dan kemotaksonomi",
+    "indikator": "Mengevaluasi sumber bahan alam sebagai kandidat bahan baku farmasi berdasarkan aspek taksonomi dan kemotaksonomi",
+    "kriteriaTeknik": "Kriteria: ketepatan komparasi, dasar ilmiah.\\nTeknik: penilaian tabel analisis + observasi diskusi.",
+    "bentukMetodePenugasan": "Bentuk: Diskusi kelompok\\nMetode: Problem-based learning\\nPenugasan: Tabel komparasi literatur.",
+    "luring": "Kuliah, tatap muka",
+    "daring": "E-campus",
+    "materiPustaka": "Botanical source dan pendekatan kemotaksonomi dalam eksplorasi metabolit sekunder. Pustaka: Heinrich et al., Fundamentals of Pharmacognosy and Phytotherapy; FHI Edisi II.",
+    "bobot": 5
+  }
+]`,
+      }
     default:
       return {
         section,

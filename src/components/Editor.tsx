@@ -536,7 +536,7 @@ export function Editor({ project, onUpdate, onSave, onExport, onOpenAISettings, 
   }
 
   const handleSaveCustomCommand = () => {
-    onUpdate({ custom_command_ai: customCommandText.trim() })
+    updateField('custom_command_ai', customCommandText.trim())
     setShowCustomCommandDialog(false)
     safeToast('Custom command tersimpan.', 'info')
   }

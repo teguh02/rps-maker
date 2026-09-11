@@ -70,7 +70,7 @@ export function Ribbon({
   onSave, onExport, onOpenAISettings, onGoHome, activeSection, onGenerateAI, aiLoading,
   onCut, onCopy, onPaste, onUndo, onRedo, canUndo, canRedo,
   onZoomIn, onZoomOut, onZoomReset, onPreview, isFullscreen, onToggleFullscreen, onShowShortcuts, onShowAbout,
-  onOpenMasterBerkas,
+  onOpenMasterBerkas, onOpenCustomCommands,
 }: RibbonProps) {
   const [activeTab, setActiveTab] = useState<TabId>('home')
   const [showContent, setShowContent] = useState(true)

@@ -1126,37 +1126,37 @@ export function Editor({ project, onUpdate, onSave, onExport, onOpenAISettings, 
       {/* Custom AI Command Dialog */}
       {showCustomCommandDialog && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40" onClick={() => setShowCustomCommandDialog(false)}>
-          <div className="bg-white rounded-lg shadow-xl w-[520px] max-h-[80vh] flex flex-col" onClick={(e) => e.stopPropagation()}>
-            <div className="flex items-center justify-between px-5 py-3 border-b border-gray-200">
-              <h3 className="text-sm font-semibold text-gray-800">Custom Commands</h3>
-              <button className="text-gray-400 hover:text-gray-600" onClick={() => setShowCustomCommandDialog(false)}>
+          <div className="bg-white rounded-lg shadow-xl w-[520px] max-h-[80vh] flex flex-col" style={{ padding: 0 }} onClick={(e) => e.stopPropagation()}>
+            <div style={{ padding: '16px 24px', borderBottom: '1px solid #e5e7eb', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+              <h3 style={{ fontSize: '14px', fontWeight: 600, color: '#1f2937', margin: 0 }}>Custom Commands</h3>
+              <button style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#9ca3af', padding: 4 }} onClick={() => setShowCustomCommandDialog(false)}>
                 <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
               </button>
             </div>
-            <div className="px-5 py-4 flex-1 overflow-y-auto">
-              <p className="text-xs text-gray-500 mb-3">
+            <div style={{ padding: '20px 24px', flex: 1, overflowY: 'auto' }}>
+              <p style={{ fontSize: '12px', color: '#6b7280', marginBottom: 12 }}>
                 Tulis perintah custom yang akan ditambahkan ke instruksi utama AI saat generate semua section.
               </p>
               <textarea
-                className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm text-gray-800 resize-none focus:outline-none focus:border-blue-400 focus:ring-1 focus:ring-blue-400"
+                style={{ width: '100%', border: '1px solid #d1d5db', borderRadius: 6, padding: '10px 12px', fontSize: '13px', color: '#1f2937', resize: 'none', outline: 'none', minHeight: 120, fontFamily: 'inherit' }}
                 rows={5}
                 placeholder={'Contoh: Gunakan bahasa formal akademik, sertakan referensi kurikulum 2025, hindari istilah asing tanpa penjelasan...'}
                 value={customCommandText}
                 onChange={(e) => setCustomCommandText(e.target.value)}
               />
-              <p className="text-[11px] text-gray-400 mt-2">
+              <p style={{ fontSize: '11px', color: '#9ca3af', marginTop: 8 }}>
                 Perintah ini akan disisipkan di akhir system prompt untuk semua section AI.
               </p>
             </div>
-            <div className="flex items-center justify-end gap-2 px-5 py-3 border-t border-gray-200">
+            <div style={{ padding: '12px 24px', borderTop: '1px solid #e5e7eb', display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: 8 }}>
               <button
-                className="px-4 py-1.5 text-xs font-medium text-gray-600 border border-gray-300 rounded-md hover:bg-gray-50"
+                style={{ padding: '6px 16px', fontSize: '12px', fontWeight: 500, color: '#4b5563', border: '1px solid #d1d5db', borderRadius: 6, background: 'white', cursor: 'pointer' }}
                 onClick={() => setShowCustomCommandDialog(false)}
               >
                 Batal
               </button>
               <button
-                className="px-4 py-1.5 text-xs font-medium text-white bg-blue-600 rounded-md hover:bg-blue-700"
+                style={{ padding: '6px 16px', fontSize: '12px', fontWeight: 500, color: 'white', background: '#2563eb', borderRadius: 6, border: 'none', cursor: 'pointer' }}
                 onClick={handleSaveCustomCommand}
               >
                 Simpan

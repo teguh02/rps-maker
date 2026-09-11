@@ -508,6 +508,39 @@ export function Editor({ project, onUpdate, onSave, onExport, onOpenAISettings, 
           logger.warn('EDITOR', 'editor.ai_invalid_json', { section })
           safeToast('AI mengembalikan format tidak valid. Coba generate ulang.', 'error')
         }
+      // Pertemuan needs JSON parsing + UTS/UAS markers
+      } else if (section === 'pertemuan') {
+        try {
+          const parsed = JSON.parse(result)
+          if (Array.isArray(parsed)) {
+            const items: PertemuanRow[] = []
+            for (let i = 0; i < parsed.length; i++) {
+              const row = parsed[i]
+              if (row.no === 8) {
+                items.push({ type: 'uts', no: 0, label: 'Evaluasi Tengah Semester (UTS)' })
+              }
+              if (row.no === 16) {
+                items.push({ type: 'uas', no: 0, label: 'Evaluasi Akhir Semester (UAS)' })
+              }
+              items.push({
+                no: row.no || i + 1,
+                subCpmk: row.subCpmk || '',
+                indikator: row.indikator || '',
+                kriteriaTeknik: row.kriteriaTeknik || '',
+                bentukMetodePenugasan: row.bentukMetodePenugasan || '',
+                luring: row.luring || '',
+                daring: row.daring || '',
+                materiPustaka: row.materiPustaka || '',
+                bobot: row.bobot || 5,
+              })
+            }
+            updatePertemuan(items)
+          } else {
+            updateField(section, result)
+          }
+        } catch {
+          updateField(section, result)
+        }
       // Pustaka has two fields
       } else if (section === 'pustaka') {
         try {
